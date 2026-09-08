@@ -7,37 +7,85 @@ struct ProjectsView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $model.selectedID) {
-                Section("PROJEKTE") {
-                    ForEach(model.projects) { project in
-                        Label(project.name, systemImage: "folder")
-                            .tag(project.id)
+            List(selection: $model.selectedPath) {
+                Section("STAMMORDNER") {
+                    ForEach(model.rootSettings.paths, id: \.self) { path in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Label(URL(fileURLWithPath: path).lastPathComponent, systemImage: "folder.badge.gearshape")
+                            Text(path).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        .help(path)
+                        .contextMenu {
+                            Button("Stammordner entfernen (Projekte behalten)") { model.removeRoot(path) }
+                        }
+                    }
+                    Button(action: model.addRootFolder) {
+                        Label("Stammordner hinzufügen …", systemImage: "plus")
+                    }.buttonStyle(.plain)
+                }
+                Section("PROJEKTE · \(model.listedRepositories.count)") {
+                    ForEach(model.listedRepositories) { repository in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Label(repository.name, systemImage: repository.project == nil ? "folder.badge.questionmark" : "folder")
+                            Text(repository.project.map { "\($0.executable) run dev" } ?? "Kein dev-Befehl")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .tag(repository.directoryPath)
+                        .help(repository.directoryPath)
                     }
                 }
             }
-            .navigationSplitViewColumnWidth(min: 190, ideal: 230)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260)
             .safeAreaInset(edge: .bottom) {
-                Button(action: model.addProject) {
-                    Label("Projekt hinzufügen", systemImage: "plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .padding(12)
+                VStack(spacing: 8) {
+                    Button(action: model.rescan) {
+                        Label(model.isScanning ? "Suche läuft …" : "Jetzt aktualisieren", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }.disabled(model.isScanning)
+                    Menu("Weitere Aktionen") {
+                        Button("Einzelnes Projekt hinzufügen …", action: model.addProject)
+                        if !model.rootSettings.hiddenRepositoryPaths.isEmpty {
+                            Button("Ausgeblendete Projekte wieder anzeigen", action: model.showHiddenRepositories)
+                        }
+                    }
+                    if !model.scanWarnings.isEmpty {
+                        Text(model.scanWarnings.joined(separator: "\n"))
+                            .font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+                    }
+                }.padding(12).background(.bar)
             }
         } detail: {
-            if let project = model.projects.first(where: { $0.id == model.selectedID }) {
+            if let repository = model.listedRepositories.first(where: { $0.directoryPath == model.selectedPath }),
+               let issue = repository.issue {
+                VStack(alignment: .leading, spacing: 16) {
+                    Label(repository.name, systemImage: "folder").font(.largeTitle.bold())
+                    Text(repository.directoryPath).foregroundStyle(.secondary).textSelection(.enabled)
+                    Label("Git-Projekt erkannt", systemImage: "checkmark.circle")
+                    Text(issue).textSelection(.enabled)
+                    Text("Das Repository bleibt sichtbar. Sobald ein gültiges dev-Script vorhanden ist, erscheint beim nächsten Scan der Startbefehl.")
+                        .foregroundStyle(.secondary)
+                    Button("Erneut prüfen", action: model.rescan).disabled(model.isScanning)
+                    if let saved = model.projects.first(where: { $0.directoryPath == repository.directoryPath }),
+                       model.automation(for: saved).process.isRunning {
+                        Button("Laufenden Prozess stoppen") { model.automation(for: saved).stopManually() }
+                    }
+                    Spacer()
+                }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+            } else if let project = model.projects.first(where: { $0.directoryPath == model.selectedPath }) {
                 ProjectDetail(project: project, automation: model.automation(for: project), process: model.automation(for: project).process, model: model)
                     .id(project.id)
             } else {
                 ContentUnavailableView {
-                    Label("Dein nächstes Projekt", systemImage: "terminal")
+                    Label(model.isScanning ? "Git-Projekte werden gesucht" : "Deine Projekte, automatisch", systemImage: "folder.badge.gearshape")
                 } description: {
-                    Text("Füge ein Webprojekt hinzu und starte dessen Entwicklungsserver direkt hier.")
+                    Text("Wähle einen Stammordner wie ~/gits. DevWatch findet darin Git-Repositories und Worktrees – auch ohne Frontend-Script.")
                 } actions: {
-                    Button("Projekt auswählen …", action: model.addProject)
+                    Button("Stammordner auswählen …", action: model.addRootFolder)
                         .buttonStyle(.borderedProminent)
                 }
             }
         }
+        .task { model.activateDiscovery() }
         .frame(minWidth: 760, minHeight: 520)
         .alert("Aktion nicht möglich", isPresented: Binding(
             get: { model.errorMessage != nil },
@@ -152,7 +200,7 @@ private struct ProjectDetail: View {
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
             HStack {
                 Spacer()
-                Button("Projekt entfernen …", role: .destructive) { showRemoveConfirmation = true }
+                Button("Projekt ausblenden …", role: .destructive) { showRemoveConfirmation = true }
                     .disabled(process.isRunning)
             }
         }
@@ -182,9 +230,9 @@ private struct ProjectDetail: View {
                 }
             }.padding(24).frame(width: 490)
         }
-        .confirmationDialog("Projekt aus DevWatch entfernen? Die Dateien bleiben erhalten.",
+        .confirmationDialog("Projekt ausblenden? Die Dateien bleiben erhalten. Du kannst ausgeblendete Projekte über „Weitere Aktionen“ wieder anzeigen.",
                             isPresented: $showRemoveConfirmation) {
-            Button("Entfernen", role: .destructive) { model.remove(project) }
+            Button("Ausblenden", role: .destructive) { model.remove(project) }
         }
     }
 

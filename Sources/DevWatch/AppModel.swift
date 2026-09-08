@@ -5,7 +5,15 @@ import DevWatchCore
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var projects: [DevProject] = []
-    @Published var selectedID: UUID?
+    @Published var selectedPath: String?
+    @Published private(set) var rootSettings = RootFolderSettings()
+    @Published private(set) var repositories: [DiscoveredRepository] = []
+    @Published private(set) var isScanning = false
+    @Published private(set) var scanWarnings: [String] = []
+    private var scanTask: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
+    private let rootStorage: RootFolderSettingsStorage
+    private var rootsAvailable = true
     @Published var errorMessage: String?
     private var automations: [UUID: ProjectAutomation] = [:]
     private var subscriptions: [UUID: AnyCancellable] = [:]
@@ -16,9 +24,12 @@ final class AppModel: ObservableObject {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DevWatch", isDirectory: true)
         storage = ProjectStorage(fileURL: directory.appendingPathComponent("projects.json"))
+        rootStorage = RootFolderSettingsStorage(fileURL: directory.appendingPathComponent("roots.json"))
+        do { rootSettings = try rootStorage.load() }
+        catch { rootsAvailable = false; errorMessage = "Stammordner konnten nicht geladen werden: \(error.localizedDescription)" }
         do {
             projects = try storage.load()
-            selectedID = projects.first?.id
+            selectedPath = projects.first?.directoryPath
             let restored = projects
             for project in restored { _ = automation(for: project) }
             refreshOwnership()
@@ -27,6 +38,111 @@ final class AppModel: ObservableObject {
             storageAvailable = false
             errorMessage = "Projektliste konnte nicht geladen werden: \(error.localizedDescription)"
         }
+    }
+
+    var listedRepositories: [DiscoveredRepository] {
+        var list = repositories.filter { !rootSettings.hiddenRepositoryPaths.contains($0.directoryPath) }.map { repository in
+            if repository.issue == nil, let saved = projects.first(where: { $0.directoryPath == repository.directoryPath }) {
+                return DiscoveredRepository(directoryPath: saved.directoryPath, project: saved, issue: nil)
+            }
+            return repository
+        }
+        let discovered = Set(list.map(\.directoryPath))
+        list += projects.filter { !discovered.contains($0.directoryPath) && !rootSettings.hiddenRepositoryPaths.contains($0.directoryPath) }
+            .map { DiscoveredRepository(directoryPath: $0.directoryPath, project: $0, issue: nil) }
+        return list.sorted { $0.directoryPath.localizedStandardCompare($1.directoryPath) == .orderedAscending }
+    }
+
+    func activateDiscovery() {
+        guard refreshTask == nil else { return }
+        rescan()
+        refreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                self?.rescan()
+            }
+        }
+    }
+
+    func addRootFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "Stammordner hinzufügen"
+        panel.message = "Git-Repositories und Worktrees werden rekursiv gesucht. Es werden keine Entwicklungsprozesse gestartet."
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return }
+        var updated = rootSettings
+        for url in panel.urls {
+            let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+            if !updated.paths.contains(path) { updated.paths.append(path) }
+        }
+        guard saveRoots(updated) else { return }
+        rescan()
+    }
+
+    func removeRoot(_ path: String) {
+        var updated = rootSettings
+        updated.paths.removeAll { $0 == path }
+        guard saveRoots(updated) else { return }
+        rescan()
+    }
+
+    func showHiddenRepositories() {
+        var updated = rootSettings
+        updated.hiddenRepositoryPaths = []
+        guard saveRoots(updated) else { return }
+        rescan()
+    }
+
+    func rescan() {
+        guard !isScanning, rootsAvailable, storageAvailable else { return }
+        isScanning = true
+        let roots = rootSettings.paths
+        scanTask = Task { [weak self] in
+            let result = await Task.detached(priority: .utility) { RepositoryScanner.scan(roots: roots) }.value
+            guard let self, !Task.isCancelled else { return }
+            // A changed root selection is picked up by a fresh scan, never by this stale result.
+            guard self.rootSettings.paths == roots else {
+                self.isScanning = false
+                self.rescan()
+                return
+            }
+            self.scanWarnings = result.warnings
+            self.repositories = result.repositories
+            var updated = self.projects
+            for repository in result.repositories where !self.rootSettings.hiddenRepositoryPaths.contains(repository.directoryPath) {
+                if let candidate = repository.project,
+                   !updated.contains(where: { $0.directoryPath == candidate.directoryPath }) {
+                    updated.append(candidate)
+                }
+                if repository.project == nil,
+                   let existing = self.automations.values.first(where: { $0.project.directoryPath == repository.directoryPath }),
+                   existing.project.autostartEnabled {
+                    existing.pause(reason: repository.issue ?? "Kein Entwicklungsbefehl erkannt")
+                }
+            }
+            do {
+                // Preserve any pauses persisted above rather than overwriting them with the scan snapshot.
+                let additions = updated.filter { candidate in !self.projects.contains { $0.id == candidate.id } }
+                if !additions.isEmpty { try self.persist(self.projects + additions) }
+                for project in self.projects { _ = self.automation(for: project) }
+                self.refreshOwnership()
+                if self.selectedPath == nil { self.selectedPath = self.listedRepositories.first?.directoryPath }
+            } catch { self.errorMessage = error.localizedDescription }
+            self.isScanning = false
+        }
+    }
+
+    private func saveRoots(_ updated: RootFolderSettings) -> Bool {
+        guard rootsAvailable else {
+            errorMessage = "Die bestehende Stammordner-Datei ist nicht lesbar und wird nicht überschrieben."
+            return false
+        }
+        do { try rootStorage.save(updated); rootSettings = updated; return true }
+        catch { errorMessage = error.localizedDescription; return false }
     }
 
     var runningCount: Int { automations.values.filter { $0.process.isRunning }.count }
@@ -51,8 +167,8 @@ final class AppModel: ObservableObject {
     private func refreshOwnership() {
         for automation in automations.values {
             let prefix = automation.project.directoryPath + "/"
-            automation.excludedDirectories = projects.compactMap {
-                $0.directoryPath.hasPrefix(prefix) ? String($0.directoryPath.dropFirst(prefix.count)) : nil
+            automation.excludedDirectories = Set(projects.map(\.directoryPath) + repositories.map(\.directoryPath)).compactMap {
+                $0.hasPrefix(prefix) ? String($0.dropFirst(prefix.count)) : nil
             }
         }
     }
@@ -68,14 +184,19 @@ final class AppModel: ObservableObject {
         guard panel.runModal() == .OK, let directory = panel.url else { return }
         do {
             let candidate = try ProjectDiscovery.inspect(directory: directory.resolvingSymlinksInPath())
+            if rootSettings.hiddenRepositoryPaths.contains(candidate.directoryPath) {
+                var settings = rootSettings
+                settings.hiddenRepositoryPaths.removeAll { $0 == candidate.directoryPath }
+                guard saveRoots(settings) else { return }
+            }
             if let existing = projects.first(where: { $0.directoryPath == candidate.directoryPath }) {
-                selectedID = existing.id
+                selectedPath = existing.directoryPath
                 return
             }
             var updated = projects
             updated.append(candidate)
             try persist(updated)
-            selectedID = candidate.id
+            selectedPath = candidate.directoryPath
             _ = automation(for: candidate)
             refreshOwnership()
         } catch { errorMessage = error.localizedDescription }
@@ -98,18 +219,25 @@ final class AppModel: ObservableObject {
 
     func remove(_ project: DevProject) {
         guard !automation(for: project).process.isRunning else { return }
+        var settings = rootSettings
+        if !settings.hiddenRepositoryPaths.contains(project.directoryPath) { settings.hiddenRepositoryPaths.append(project.directoryPath) }
+        guard saveRoots(settings) else { return }
         do {
             try persist(projects.filter { $0.id != project.id })
             automations.removeValue(forKey: project.id)?.shutdown()
             refreshOwnership()
             subscriptions.removeValue(forKey: project.id)
-            selectedID = projects.first?.id
+            selectedPath = projects.first?.directoryPath
         } catch { errorMessage = error.localizedDescription }
     }
 
     func stopAll() { automations.values.forEach { $0.stopManually() } }
 
-    func shutdown() { automations.values.forEach { $0.shutdown() } }
+    func shutdown() {
+        scanTask?.cancel()
+        refreshTask?.cancel()
+        automations.values.forEach { $0.shutdown() }
+    }
 
     private func persist(_ updated: [DevProject]) throws {
         guard storageAvailable else {

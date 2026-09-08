@@ -1,6 +1,6 @@
 import Foundation
 
-public struct DevProject: Identifiable, Codable, Equatable {
+public struct DevProject: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var directoryPath: String
     public var executable: String

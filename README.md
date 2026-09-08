@@ -87,7 +87,7 @@ Ein gestarteter Prozess gilt nicht allein deshalb als erreichbarer Server. Für 
 
 ### 3. Mehrere Projekte und Erkennung
 
-- [ ] Ausgewählte Stammordner nach Projekten durchsuchen, ohne Abhängigkeitsordner zu durchlaufen.
+- [x] Ausgewählte Stammordner nach Git-Projekten und Worktrees durchsuchen, ohne Abhängigkeitsordner zu durchlaufen.
 - [ ] `package.json`, `packageManager` und Lockfiles für Befehlsvorschläge auswerten.
 - [ ] Fehlende Scripts, widersprüchliche Lockfiles und fehlende Abhängigkeiten verständlich anzeigen; keine automatische Installation.
 - [ ] Mehrere Projekte und Git-Worktrees unabhängig verwalten.
@@ -150,21 +150,24 @@ Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs 
 
 ### Erste Verwendung
 
-1. Einen einzelnen Projektordner mit `package.json` und `dev`-Script hinzufügen.
+1. Über „Stammordner hinzufügen …“ beispielsweise `~/gits` wählen. Git-Repositories und Worktrees werden rekursiv gefunden. Alternativ über „Weitere Aktionen“ ein einzelnes Webprojekt hinzufügen.
 2. Den vorgeschlagenen Paketmanager und das `dev`-Script des Projekts prüfen.
 3. Falls erforderlich den Programmnamen durch einen absoluten Pfad ersetzen und speichern.
 4. Mit „Autostart freigeben …“ Befehl und Script-Vorschau prüfen und bestätigen. Die Freigabe allein startet nichts; erst eine folgende relevante Dateiänderung startet den Prozess. Alternativ bleibt „Starten“ verfügbar.
 5. Mit „Stoppen“ beenden und den Autostart pausieren. Eine Pause bleibt über App-Neustarts erhalten. „Autostart pausieren“ lässt einen bereits laufenden Prozess weiterlaufen.
 6. Zum Fortsetzen erneut freigeben. Das Schließen des Fensters lässt die App in der Menüleiste weiterlaufen; „DevWatch beenden“ beendet Beobachtung und Prozesse, ohne eine zuvor aktive Freigabe zu pausieren.
 
-Die Projektliste liegt unter `~/Library/Application Support/DevWatch/projects.json`. Logs bleiben im Arbeitsspeicher. Das Entfernen eines Projekts aus der Liste löscht keine Projektdateien.
+Die Projektliste liegt unter `~/Library/Application Support/DevWatch/projects.json`; Stammordner und ausgeblendete Pfade werden daneben in `roots.json` gespeichert. Logs bleiben im Arbeitsspeicher. Das Entfernen eines Projekts aus der Liste löscht keine Projektdateien.
 
-Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 32 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Zusätzlich wurden die Autostart-Freigabe mit Script-Vorschau, der automatische Start nach PHP-Dateiänderung und die wirksame Pause nach manuellem Stoppen in der App geprüft. Die Tests decken alle vier Paketmanager, Freigabeänderungen, FSEvents und verschachtelte Projekte ab. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
+Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 41 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Zusätzlich wurden die Autostart-Freigabe mit Script-Vorschau, der automatische Start nach PHP-Dateiänderung und die wirksame Pause nach manuellem Stoppen in der App geprüft. Die Tests decken alle vier Paketmanager, Freigabeänderungen, FSEvents, rekursive Repository-Suche, Worktree-Marker, überlappende Suchordner, fehlende Frontend-Konfiguration und Stammordner-Persistenz ab. Die Stammordnerauswahl und die Anzeige realer Repositories wurden zusätzlich in der App geprüft. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
 
 ### Bekannte Grenzen dieses ersten Schritts
 
 - Der Entwicklungsbefehl verwendet derzeit die Argumente `run dev`; der Programmname beziehungsweise Programmpfad ist editierbar.
-- Automatische Suche unter einem Repository-Stammordner steht noch aus. Projekte werden einzeln hinzugefügt. Registrierte verschachtelte Projekte werden dem jeweils tieferen Projekt zugeordnet.
+- Stammordner werden beim App-Start, auf Knopfdruck und alle 30 Sekunden im Hintergrund geprüft. Auch Git-Projekte ohne `package.json` beziehungsweise ohne gültiges `dev`-Script werden angezeigt, allerdings ohne Startmöglichkeit.
+- Verschachtelte Git-Repositories, Worktree-/Submodul-Verweise per `.git`-Datei und überlappende Stammordner werden berücksichtigt. Symlink-Unterverzeichnisse sowie Abhängigkeits-, Build- und Cache-Ordner werden übersprungen; bare Git-Repositories ohne `.git`-Marker werden nicht erkannt.
+- Bestehende Projektbefehle, IDs und Freigaben bleiben beim Scan erhalten. Das Entfernen eines Stammordners beendet dessen Scans und behält bereits übernommene startbare Projekte. „Projekt ausblenden“ verhindert, dass ein Eintrag beim nächsten Scan erneut erscheint; „Weitere Aktionen“ kann ausgeblendete Projekte wieder anzeigen.
+- Registrierte verschachtelte Projekte werden dem jeweils tieferen Projekt zugeordnet. Nicht lesbare Suchordner oder Einträge werden als Warnung angezeigt.
 - Die Erkennung bevorzugt `packageManager`; ohne diese Angabe werden `bun.lock`/`bun.lockb`, `yarn.lock`, `package-lock.json`/`npm-shrinkwrap.json` und `pnpm-lock.yaml` geprüft. Mehrere unterschiedliche Manager führen zu einem Hinweis. Ohne Angaben wird npm vorgeschlagen. Die Installation von Abhängigkeiten erfolgt nicht automatisch.
 - Jede Änderung an `package.json` erfordert eine neue Freigabe, auch eine reine Formatierungsänderung. Die Prüfung erfolgt vor jedem automatischen Start und beim erneuten Beobachten nach einem App-Neustart. Veränderte Quellcodedateien benötigen keine neue Freigabe.
 - Symlink-Ziele außerhalb des Projektordners werden nicht beobachtet. Verschobene/entfernte Projektwurzeln oder verlorene Dateiereignisse pausieren die Beobachtung; anschließend muss das Projekt geprüft und erneut freigegeben werden.

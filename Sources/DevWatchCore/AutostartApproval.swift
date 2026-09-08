@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 
 /// Binds an explicit approval to a directory, command and exact manifest contents.
-public struct AutostartApproval: Codable, Equatable {
+public struct AutostartApproval: Codable, Equatable, Sendable {
     public let fingerprint: String
 
     public enum ApprovalError: LocalizedError, Equatable {
