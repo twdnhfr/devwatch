@@ -20,23 +20,29 @@ struct DevWatchApp: App {
 /// A non-template image preserves the badge color in the macOS status bar.
 enum MenuBarIcon {
     static func make(running: Bool, scanning: Bool, dark: Bool) -> NSImage {
+        let logo = Bundle.main.url(forResource: "DevWatch", withExtension: "icns")
+            .flatMap { NSImage(contentsOf: $0) }
         let image = NSImage(size: NSSize(width: 22, height: 18), flipped: false) { _ in
-            let ink: NSColor = dark ? .white : .black
-            ink.setStroke()
-            let frame = NSBezierPath(roundedRect: NSRect(x: 1.5, y: 3.5, width: 17, height: 12),
-                                     xRadius: 2, yRadius: 2)
-            frame.lineWidth = 1.4
-            frame.stroke()
-            let prompt = NSBezierPath()
-            prompt.move(to: NSPoint(x: 5, y: 12))
-            prompt.line(to: NSPoint(x: 8, y: 9.5))
-            prompt.line(to: NSPoint(x: 5, y: 7))
-            prompt.move(to: NSPoint(x: 10, y: 7))
-            prompt.line(to: NSPoint(x: 14, y: 7))
-            prompt.lineWidth = 1.4
-            prompt.lineCapStyle = .round
-            prompt.lineJoinStyle = .round
-            prompt.stroke()
+            if let logo {
+                logo.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+            } else {
+                let ink: NSColor = dark ? .white : .black
+                ink.setStroke()
+                let frame = NSBezierPath(roundedRect: NSRect(x: 1.5, y: 3.5, width: 17, height: 12),
+                                         xRadius: 2, yRadius: 2)
+                frame.lineWidth = 1.4
+                frame.stroke()
+                let prompt = NSBezierPath()
+                prompt.move(to: NSPoint(x: 5, y: 12))
+                prompt.line(to: NSPoint(x: 8, y: 9.5))
+                prompt.line(to: NSPoint(x: 5, y: 7))
+                prompt.move(to: NSPoint(x: 10, y: 7))
+                prompt.line(to: NSPoint(x: 14, y: 7))
+                prompt.lineWidth = 1.4
+                prompt.lineCapStyle = .round
+                prompt.lineJoinStyle = .round
+                prompt.stroke()
+            }
             if running || scanning {
                 // Running takes priority so periodic discovery never hides the green badge.
                 let badge = NSBezierPath(ovalIn: NSRect(x: 14.5, y: 0.5, width: 7, height: 7))
@@ -48,7 +54,7 @@ enum MenuBarIcon {
             }
             return true
         }
-        image.isTemplate = !running && !scanning
+        image.isTemplate = logo == nil && !running && !scanning
         image.accessibilityDescription = "DevWatch"
         return image
     }
@@ -58,6 +64,14 @@ enum MenuBarIcon {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
     private var statusController: StatusItemController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Set the running app's icon explicitly, including after a local bundle rebuild.
+        if let url = Bundle.main.url(forResource: "DevWatch", withExtension: "icns"),
+           let icon = NSImage(contentsOf: url) {
+            NSApplication.shared.applicationIconImage = icon
+        }
+    }
 
     func configure(model: AppModel) {
         self.model = model
