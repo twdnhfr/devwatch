@@ -13,6 +13,7 @@ struct ActivityApprovalPrompt: Identifiable {
 @MainActor
 final class AppModel: ObservableObject {
     @Published var approvalPrompts: [ActivityApprovalPrompt] = []
+    @Published var showFolders = false
     var openProjectsWindow: (() -> Void)?
     @Published private(set) var projects: [DevProject] = []
     @Published var selectedPath: String?

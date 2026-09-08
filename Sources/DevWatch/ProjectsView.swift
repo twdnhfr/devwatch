@@ -6,7 +6,6 @@ struct ProjectsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @State private var search = ""
-    @State private var showFolders = false
 
     private var visibleRepositories: [DiscoveredRepository] {
         model.listedRepositories.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
@@ -26,7 +25,7 @@ struct ProjectsView: View {
             .navigationSplitViewColumnWidth(min: 190, ideal: 220)
             .safeAreaInset(edge: .bottom) {
                 HStack {
-                    Button { showFolders = true } label: {
+                    Button { model.showFolders = true } label: {
                         Image(systemName: "folder.badge.gearshape")
                     }.help("Stammordner verwalten").accessibilityLabel("Stammordner verwalten")
                     Text("\(model.listedRepositories.count) Projekte")
@@ -83,7 +82,7 @@ struct ProjectsView: View {
             }
         }
         .frame(minWidth: 660, minHeight: 400)
-        .sheet(isPresented: $showFolders) { foldersSheet }
+        .sheet(isPresented: $model.showFolders) { foldersSheet }
         .alert("Aktion nicht möglich", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -129,7 +128,7 @@ struct ProjectsView: View {
                 } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.borderlessButton).fixedSize().help("Weitere Aktionen")
                 Spacer()
-                Button("Fertig") { showFolders = false }.keyboardShortcut(.defaultAction)
+                Button("Fertig") { model.showFolders = false }.keyboardShortcut(.defaultAction)
             }
         }.padding(24).frame(width: 470)
     }

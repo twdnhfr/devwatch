@@ -22,7 +22,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem = item
         item.button?.target = self
-        item.button?.action = #selector(togglePopover)
+        item.button?.action = #selector(handleClick)
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         popover.behavior = .transient
         popover.delegate = self
         let content = NSHostingController(rootView: StatusPopoverView(model: model))
@@ -54,7 +55,44 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         statusItem = nil
     }
 
-    @objc private func togglePopover() {
+    @objc private func handleClick() {
+        if NSApp.currentEvent?.type == .rightMouseUp ||
+            NSApp.currentEvent?.modifierFlags.contains(.control) == true {
+            showContextMenu()
+            return
+        }
+        togglePopover()
+    }
+
+    private func showContextMenu() {
+        guard let button = statusItem?.button else { return }
+        popover.performClose(nil)
+        let menu = NSMenu()
+        func add(_ title: String, _ action: Selector) {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = self
+            menu.addItem(item)
+        }
+        add("Projekte …", #selector(openProjects))
+        add("Stammordner verwalten …", #selector(openFolders))
+        if model.runningCount > 0 {
+            menu.addItem(.separator())
+            add("Alle stoppen", #selector(stopAll))
+        }
+        menu.addItem(.separator())
+        add("DevWatch beenden", #selector(quit))
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
+    }
+
+    @objc private func openProjects() { model.openProjectsWindow?() }
+    @objc private func openFolders() {
+        model.openProjectsWindow?()
+        model.showFolders = true
+    }
+    @objc private func stopAll() { model.stopAll() }
+    @objc private func quit() { NSApp.terminate(nil) }
+
+    private func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
         } else {
@@ -163,27 +201,9 @@ private struct StatusPopoverView: View {
                 }
                 .frame(maxHeight: 150)
             }
-            Divider()
-            HStack {
-                Button("Projekte …") { model.openProjectsWindow?() }
-                Spacer()
-                if model.approvalPrompts.count > 1 {
-                    Text("\(model.approvalPrompts.count - 1) weitere")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Menu {
-                    if model.runningCount > 0 {
-                        Button("Alle stoppen") { model.stopAll() }
-                        Divider()
-                    }
-                    Button("Beenden") { NSApp.terminate(nil) }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .accessibilityLabel("Weitere Aktionen")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
+            if model.approvalPrompts.count > 1 {
+                Text("\(model.approvalPrompts.count - 1) weitere")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(14)
