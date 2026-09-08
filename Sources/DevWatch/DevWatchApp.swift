@@ -9,35 +9,11 @@ struct DevWatchApp: App {
     var body: some Scene {
         Window("DevWatch", id: "projects") {
             ProjectsView(model: model)
-                .onAppear { delegate.model = model }
+                .onAppear { delegate.configure(model: model) }
         }
         .defaultSize(width: 920, height: 620)
 
-        MenuBarExtra {
-            MenuContent(model: model)
-                .onAppear { delegate.model = model }
-        } label: {
-            MenuBarStatusLabel(model: model)
-        }
-    }
-}
 
-private struct MenuBarStatusLabel: View {
-    @ObservedObject var model: AppModel
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var status: String {
-        if model.runningCount > 0 { return "\(model.runningCount) Entwicklungsprozesse laufen" }
-        if model.isScanning { return "Git-Projekte werden gesucht" }
-        return "Keine Entwicklungsprozesse aktiv"
-    }
-
-    var body: some View {
-        Image(nsImage: MenuBarIcon.make(running: model.runningCount > 0,
-                                       scanning: model.isScanning, dark: colorScheme == .dark))
-            .renderingMode(.original)
-            .accessibilityLabel("DevWatch: \(status)")
-            .help("DevWatch: \(status)")
     }
 }
 
@@ -81,9 +57,17 @@ enum MenuBarIcon {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
+    private var statusController: StatusItemController?
+
+    func configure(model: AppModel) {
+        self.model = model
+        if statusController == nil { statusController = StatusItemController(model: model) }
+        model.activateDiscovery()
+    }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let model else { return .terminateNow }
+        statusController?.shutdown()
         model.shutdown()
         guard model.runningCount > 0 else { return .terminateNow }
         // Keep the run loop alive until the process manager's bounded shutdown completes.
@@ -97,25 +81,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-}
-
-private struct MenuContent: View {
-    @ObservedObject var model: AppModel
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Text("\(model.runningCount) Prozesse laufen")
-        if model.isScanning { Text("Git-Projekte werden gesucht …") }
-        Divider()
-        Button("Projekte öffnen …") {
-            openWindow(id: "projects")
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        .keyboardShortcut("o")
-        Button("Alle Prozesse stoppen") { model.stopAll() }
-            .disabled(model.runningCount == 0)
-        Divider()
-        Button("DevWatch beenden") { NSApp.terminate(nil) }
-            .keyboardShortcut("q")
-    }
 }

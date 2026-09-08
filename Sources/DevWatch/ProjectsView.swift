@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ProjectsView: View {
     @ObservedObject var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -86,6 +87,12 @@ struct ProjectsView: View {
             }
         }
         .task { model.activateDiscovery() }
+        .onAppear {
+            model.openProjectsWindow = {
+                openWindow(id: "projects")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
         .frame(minWidth: 760, minHeight: 520)
         .alert("Aktion nicht möglich", isPresented: Binding(
             get: { model.errorMessage != nil },

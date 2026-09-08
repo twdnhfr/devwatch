@@ -20,7 +20,9 @@ final class ProjectAutomationTests: XCTestCase {
             let project = DevProject(directoryPath: directory.path, executable: executable)
             // This box allows the persistence callback to be installed before self exists.
             let storage = SavedProjects()
-            automation = ProjectAutomation(project: project) { value in
+            automation = ProjectAutomation(project: project, onApprovalNeeded: { project, paths in
+                storage.approvalRequests.append((project, paths))
+            }) { value in
                 storage.values.append(value)
                 return true
             }
@@ -29,6 +31,7 @@ final class ProjectAutomationTests: XCTestCase {
 
         private let saved: SavedProjects
         var lastSaved: DevProject? { saved.values.last }
+        var approvalRequests: [(DevProject, [String])] { saved.approvalRequests }
         var launchCount: Int {
             let text = (try? String(contentsOf: directory.appendingPathComponent("vendor/launches"), encoding: .utf8)) ?? ""
             return text.split(separator: "\n").count
@@ -43,6 +46,7 @@ final class ProjectAutomationTests: XCTestCase {
 
     private final class SavedProjects {
         var values: [DevProject] = []
+        var approvalRequests: [(DevProject, [String])] = []
     }
 
     @MainActor
@@ -70,6 +74,67 @@ final class ProjectAutomationTests: XCTestCase {
         let stopped = try await eventually { !fixture.automation.process.isRunning }
         XCTAssertTrue(stopped, "Fixture-Prozess muss nach shutdown beendet sein")
         try FileManager.default.removeItem(at: fixture.directory)
+    }
+
+    @MainActor
+    func testUnapprovedActivityRequestsApprovalOnlyOnceWithoutStarting() async throws {
+        try await withFixture { fixture in
+            fixture.automation.beginObserving()
+            try await Task.sleep(nanoseconds: 1_500_000_000)
+            XCTAssertTrue(fixture.approvalRequests.isEmpty)
+            try fixture.change()
+            let requested = try await eventually { fixture.approvalRequests.count == 1 }
+            XCTAssertTrue(requested)
+            XCTAssertEqual(fixture.approvalRequests.first?.0.id, fixture.automation.project.id)
+            XCTAssertTrue(fixture.approvalRequests.first?.1.contains("source.php") == true)
+            XCTAssertEqual(fixture.automation.lastChange, "source.php")
+            XCTAssertFalse(fixture.automation.process.isRunning)
+            XCTAssertEqual(fixture.launchCount, 0)
+            // Rescanning/reconfiguration must not repeatedly ask about the same project.
+            fixture.automation.configure(fixture.automation.project)
+            try fixture.change(contents: "<?php // later edit")
+            try await Task.sleep(nanoseconds: 1_600_000_000)
+            XCTAssertEqual(fixture.approvalRequests.count, 1)
+            XCTAssertEqual(fixture.launchCount, 0)
+        }
+    }
+
+    @MainActor
+    func testPausedUnapprovedProjectDoesNotRequestApproval() async throws {
+        try await withFixture { fixture in
+            fixture.automation.beginObserving()
+            fixture.automation.stopManually()
+            fixture.automation.beginObserving()
+            try fixture.change()
+            try await Task.sleep(nanoseconds: 1_600_000_000)
+            XCTAssertTrue(fixture.approvalRequests.isEmpty)
+            XCTAssertFalse(fixture.automation.process.isRunning)
+        }
+    }
+
+    @MainActor
+    func testApproveAndStartLaunchesWithoutAnotherFileChange() async throws {
+        try await withFixture { fixture in
+            fixture.automation.beginObserving()
+            let approval = try AutostartApproval.capture(project: fixture.automation.project)
+            fixture.automation.approveAndStart(approval: approval)
+            let started = try await eventually { fixture.automation.process.isRunning && fixture.launchCount == 1 }
+            XCTAssertTrue(started)
+            XCTAssertTrue(fixture.automation.project.autostartEnabled)
+        }
+    }
+
+    @MainActor
+    func testApproveAndStartRejectsStaleSnapshot() async throws {
+        try await withFixture { fixture in
+            let approval = try AutostartApproval.capture(project: fixture.automation.project)
+            try fixture.change("package.json", contents: #"{"scripts":{"dev":"different-command"}}"#)
+            fixture.automation.approveAndStart(approval: approval)
+            XCTAssertFalse(fixture.automation.process.isRunning)
+            XCTAssertFalse(fixture.automation.project.autostartEnabled)
+            XCTAssertEqual(fixture.automation.project.autostartPaused, true)
+            XCTAssertEqual(fixture.launchCount, 0)
+        }
     }
 
     @MainActor

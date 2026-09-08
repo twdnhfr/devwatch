@@ -2,8 +2,18 @@ import AppKit
 import Combine
 import DevWatchCore
 
+struct ActivityApprovalPrompt: Identifiable {
+    var id: UUID { project.id }
+    let project: DevProject
+    let approval: AutostartApproval
+    let script: String
+    let changedFiles: [String]
+}
+
 @MainActor
 final class AppModel: ObservableObject {
+    @Published var approvalPrompts: [ActivityApprovalPrompt] = []
+    var openProjectsWindow: (() -> Void)?
     @Published private(set) var projects: [DevProject] = []
     @Published var selectedPath: String?
     @Published private(set) var rootSettings = RootFolderSettings()
@@ -128,8 +138,10 @@ final class AppModel: ObservableObject {
                 // Preserve any pauses persisted above rather than overwriting them with the scan snapshot.
                 let additions = updated.filter { candidate in !self.projects.contains { $0.id == candidate.id } }
                 if !additions.isEmpty { try self.persist(self.projects + additions) }
-                for project in self.projects { _ = self.automation(for: project) }
+                let newProjects = self.projects.filter { self.automations[$0.id] == nil }
+                for project in newProjects { _ = self.automation(for: project) }
                 self.refreshOwnership()
+                for project in newProjects { self.automations[project.id]?.beginObserving() }
                 if self.selectedPath == nil { self.selectedPath = self.listedRepositories.first?.directoryPath }
             } catch { self.errorMessage = error.localizedDescription }
             self.isScanning = false
@@ -149,7 +161,9 @@ final class AppModel: ObservableObject {
 
     func automation(for project: DevProject) -> ProjectAutomation {
         if let existing = automations[project.id] { return existing }
-        let automation = ProjectAutomation(project: project) { [weak self] updated in
+        let automation = ProjectAutomation(project: project, onApprovalNeeded: { [weak self] candidate, paths in
+            self?.offerApproval(for: candidate, paths: paths)
+        }) { [weak self] updated in
             guard let self else { return false }
             var list = self.projects
             guard let index = list.firstIndex(where: { $0.id == updated.id }) else { return false }
@@ -199,7 +213,42 @@ final class AppModel: ObservableObject {
             selectedPath = candidate.directoryPath
             _ = automation(for: candidate)
             refreshOwnership()
+            automations[candidate.id]?.beginObserving()
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func offerApproval(for project: DevProject, paths: [String]) {
+        guard !rootSettings.hiddenRepositoryPaths.contains(project.directoryPath),
+              !approvalPrompts.contains(where: { $0.id == project.id }) else { return }
+        do {
+            let approval = try AutostartApproval.capture(project: project)
+            let script = try AutostartApproval.scriptDescription(project: project)
+            approvalPrompts.append(ActivityApprovalPrompt(project: project, approval: approval,
+                                                         script: script, changedFiles: paths))
+        } catch {
+            // Invalid manifests cannot be offered for execution; the project detail explains them.
+        }
+    }
+
+    func dismissActivity(_ prompt: ActivityApprovalPrompt) {
+        approvalPrompts.removeAll { $0.id == prompt.id }
+    }
+
+    func approveActivity(_ prompt: ActivityApprovalPrompt) {
+        guard let current = projects.first(where: { $0.id == prompt.id }),
+              !rootSettings.hiddenRepositoryPaths.contains(current.directoryPath) else {
+            dismissActivity(prompt)
+            return
+        }
+        guard prompt.approval.matches(project: current) else {
+            dismissActivity(prompt)
+            errorMessage = "Das Projekt oder der Befehl wurde seit dem Hinweis geändert. Bitte die aktuelle Konfiguration im Projektfenster prüfen und erneut freigeben."
+            selectedPath = current.directoryPath
+            openProjectsWindow?()
+            return
+        }
+        automation(for: current).approveAndStart(approval: prompt.approval)
+        dismissActivity(prompt)
     }
 
     func update(_ project: DevProject) {
@@ -234,6 +283,7 @@ final class AppModel: ObservableObject {
     func stopAll() { automations.values.forEach { $0.stopManually() } }
 
     func shutdown() {
+        approvalPrompts = []
         scanTask?.cancel()
         refreshTask?.cancel()
         automations.values.forEach { $0.shutdown() }
@@ -246,5 +296,10 @@ final class AppModel: ObservableObject {
         }
         try storage.save(updated)
         projects = updated
+        approvalPrompts.removeAll { prompt in
+            guard let current = updated.first(where: { $0.id == prompt.id }) else { return true }
+            return current.autostartEnabled || current.autostartPaused == true ||
+                current.executable != prompt.project.executable || current.arguments != prompt.project.arguments
+        }
     }
 }

@@ -11,11 +11,16 @@ public final class ProjectAutomation: ObservableObject {
     private var watcher: ProjectWatcher?
     private var subscription: AnyCancellable?
     private var shuttingDown = false
+    private var hasRequestedApproval = false
+    private let onApprovalNeeded: ((DevProject, [String]) -> Void)?
     private let persist: (DevProject) -> Bool
     public var excludedDirectories: [String] = []
 
-    public init(project: DevProject, persist: @escaping (DevProject) -> Bool) {
+    public init(project: DevProject,
+                onApprovalNeeded: ((DevProject, [String]) -> Void)? = nil,
+                persist: @escaping (DevProject) -> Bool) {
         self.project = project
+        self.onApprovalNeeded = onApprovalNeeded
         self.persist = persist
         subscription = process.$isRunning.dropFirst().sink { [weak self] running in
             // Published values arrive before the property's mutation has completed.
@@ -29,11 +34,11 @@ public final class ProjectAutomation: ObservableObject {
     public func beginObserving() {
         watcher?.stop()
         watcher = nil
-        guard project.autostartEnabled, !shuttingDown else {
-            status = project.autostartApproval == nil ? "Autostart nicht freigegeben" : "Autostart pausiert"
+        guard project.autostartPaused != true, !shuttingDown else {
+            status = "Autostart pausiert"
             return
         }
-        guard project.autostartApproval?.matches(project: project) == true else {
+        if let approval = project.autostartApproval, !approval.matches(project: project) {
             invalidateApproval()
             return
         }
@@ -43,7 +48,9 @@ public final class ProjectAutomation: ObservableObject {
                                           onError: { [weak self] message in self?.pause(reason: message) })
             try observer.start()
             watcher = observer
-            status = "Autostart aktiv – wartet auf Dateiänderung"
+            status = project.autostartApproval == nil
+                ? "Beobachtet Änderungen – Start noch nicht freigegeben"
+                : "Autostart aktiv – wartet auf Dateiänderung"
         } catch { pause(reason: "Dateibeobachtung fehlgeschlagen: \(error.localizedDescription)") }
     }
 
@@ -59,6 +66,15 @@ public final class ProjectAutomation: ObservableObject {
         guard persist(updated) else { return }
         project = updated
         beginObserving()
+    }
+
+    /// Confirms the activity prompt and starts immediately, without requiring another edit.
+    public func approveAndStart(approval: AutostartApproval) {
+        guard !shuttingDown else { return }
+        enable(approval: approval)
+        guard project.autostartEnabled, approval.matches(project: project),
+              project.autostartApproval == approval else { return }
+        launch()
     }
 
     public func configure(_ updated: DevProject) {
@@ -94,16 +110,22 @@ public final class ProjectAutomation: ObservableObject {
     }
 
     private func filesChanged(_ paths: [String]) {
-        guard !shuttingDown, project.autostartEnabled else { return }
+        guard !shuttingDown, project.autostartPaused != true else { return }
         let relevant = paths.filter { path in
             !excludedDirectories.contains { path == $0 || path.hasPrefix($0 + "/") }
         }
         guard !relevant.isEmpty else { return }
+        lastChange = relevant.sorted().prefix(3).joined(separator: ", ")
+        if project.autostartApproval == nil {
+            guard !process.isRunning, !hasRequestedApproval else { return }
+            hasRequestedApproval = true
+            onApprovalNeeded?(project, relevant.sorted())
+            return
+        }
         guard project.autostartApproval?.matches(project: project) == true else {
             invalidateApproval()
             return
         }
-        lastChange = relevant.sorted().prefix(3).joined(separator: ", ")
         guard !process.isRunning else { return }
         launch()
     }
