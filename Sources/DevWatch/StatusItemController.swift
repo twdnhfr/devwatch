@@ -74,7 +74,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             menu.addItem(item)
         }
         add("Projekte …", #selector(openProjects))
-        add("Stammordner verwalten …", #selector(openFolders))
+        add("Einstellungen …", #selector(openFolders))
         if model.runningCount > 0 {
             menu.addItem(.separator())
             add("Alle stoppen", #selector(stopAll))

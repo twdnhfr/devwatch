@@ -6,6 +6,7 @@ struct ProjectsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @State private var search = ""
+    @StateObject private var loginItem = LoginItemSettings()
 
     private var visibleRepositories: [DiscoveredRepository] {
         model.listedRepositories.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
@@ -27,7 +28,7 @@ struct ProjectsView: View {
                 HStack {
                     Button { model.showFolders = true } label: {
                         Image(systemName: "folder.badge.gearshape")
-                    }.help("Stammordner verwalten").accessibilityLabel("Stammordner verwalten")
+                    }.help("Einstellungen").accessibilityLabel("Einstellungen")
                     Text("\(model.listedRepositories.count) Projekte")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -93,7 +94,21 @@ struct ProjectsView: View {
 
     private var foldersSheet: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Projektordner").font(.title2.bold())
+            Text("Einstellungen").font(.title2.bold())
+            Toggle("Beim Anmelden starten", isOn: Binding(
+                get: { loginItem.isRegistered },
+                set: { loginItem.setEnabled($0) }
+            ))
+            if loginItem.requiresApproval {
+                Text("Bitte den Autostart in den macOS-Systemeinstellungen erlauben.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Anmeldeobjekte öffnen", action: loginItem.openSystemSettings)
+            }
+            if let error = loginItem.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            }
+            Divider()
+            Text("Projektordner").font(.headline)
             Text("DevWatch findet die Git-Projekte darin automatisch.").foregroundStyle(.secondary)
             if model.rootSettings.paths.isEmpty {
                 Text("Noch kein Ordner hinzugefügt.").font(.callout)
@@ -131,6 +146,10 @@ struct ProjectsView: View {
                 Button("Fertig") { model.showFolders = false }.keyboardShortcut(.defaultAction)
             }
         }.padding(24).frame(width: 470)
+            .onAppear { loginItem.refresh() }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                loginItem.refresh()
+            }
     }
 }
 
