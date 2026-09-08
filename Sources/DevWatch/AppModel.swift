@@ -159,6 +159,11 @@ final class AppModel: ObservableObject {
 
     var runningCount: Int { automations.values.filter { $0.process.isRunning }.count }
 
+    var runningProjects: [DevProject] {
+        automations.values.filter { $0.process.isRunning }.map(\.project)
+            .sorted { $0.directoryPath.localizedStandardCompare($1.directoryPath) == .orderedAscending }
+    }
+
     func automation(for project: DevProject) -> ProjectAutomation {
         if let existing = automations[project.id] { return existing }
         let automation = ProjectAutomation(project: project, onApprovalNeeded: { [weak self] candidate, paths in
