@@ -9,7 +9,9 @@ struct ProjectsView: View {
     @StateObject private var loginItem = LoginItemSettings()
 
     private var visibleRepositories: [DiscoveredRepository] {
-        model.listedRepositories.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
+        model.listedRepositories.filter {
+            $0.project != nil && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search))
+        }
     }
 
     var body: some View {
@@ -29,7 +31,7 @@ struct ProjectsView: View {
                     Button { model.showFolders = true } label: {
                         Image(systemName: "folder.badge.gearshape")
                     }.help("Einstellungen").accessibilityLabel("Einstellungen")
-                    Text("\(model.listedRepositories.count) Projekte")
+                    Text("\(visibleRepositories.count) Projekte")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     if model.isScanning {
@@ -76,6 +78,11 @@ struct ProjectsView: View {
             }
         }
         .task { model.activateDiscovery() }
+        .onChange(of: visibleRepositories.map(\.directoryPath), initial: true) { _, paths in
+            if model.selectedPath.map({ paths.contains($0) }) != true {
+                model.selectedPath = paths.first
+            }
+        }
         .onAppear {
             model.openProjectsWindow = {
                 openWindow(id: "projects")
