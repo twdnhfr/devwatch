@@ -77,6 +77,28 @@ final class ProjectAutomationTests: XCTestCase {
     }
 
     @MainActor
+    func testSuccessfulBuildKeepsApprovalAndRebuildsOnNextEdit() async throws {
+        try await withFixture { fixture in
+            try fixture.change("package.json", contents: #"{"scripts":{"build":"vite build"}}"#)
+            try fixture.change("run", contents: "printf 'start\\n' >> vendor/launches\nexit 0\n")
+            var project = fixture.automation.project
+            project.arguments = ["run", "build"]
+            fixture.automation.configure(project)
+            try fixture.enable()
+            fixture.automation.startManually()
+            let completed = try await eventually {
+                fixture.launchCount == 1 && fixture.automation.status.contains("Build abgeschlossen")
+            }
+            XCTAssertTrue(completed)
+            XCTAssertTrue(fixture.automation.project.autostartEnabled)
+            try fixture.change()
+            let rebuilt = try await eventually { fixture.launchCount == 2 && !fixture.automation.process.isRunning }
+            XCTAssertTrue(rebuilt)
+            XCTAssertTrue(fixture.automation.project.autostartEnabled)
+        }
+    }
+
+    @MainActor
     func testUnapprovedActivityRequestsApprovalOnlyOnceWithoutStarting() async throws {
         try await withFixture { fixture in
             fixture.automation.beginObserving()

@@ -28,6 +28,13 @@ final class AppModel: ObservableObject {
     @Published var errorMessage: String?
     private var automations: [UUID: ProjectAutomation] = [:]
     private var subscriptions: [UUID: AnyCancellable] = [:]
+    private struct ScriptKey: Hashable {
+        let projectID: UUID
+        let name: String
+    }
+    private var extraScripts: [ScriptKey: ProjectAutomation] = [:]
+    private var scriptSubscriptions: [ScriptKey: AnyCancellable] = [:]
+    @Published private(set) var scriptNames: [UUID: [String]] = [:]
     private let storage: ProjectStorage
     private var storageAvailable = true
 
@@ -45,6 +52,7 @@ final class AppModel: ObservableObject {
             for project in restored { _ = automation(for: project) }
             refreshOwnership()
             automations.values.forEach { $0.beginObserving() }
+            refreshScripts()
         } catch {
             storageAvailable = false
             errorMessage = "Projektliste konnte nicht geladen werden: \(error.localizedDescription)"
@@ -146,6 +154,7 @@ final class AppModel: ObservableObject {
                 if self.selectedPath == nil { self.selectedPath = self.listedRepositories.first?.directoryPath }
             } catch { self.errorMessage = error.localizedDescription }
             self.isScanning = false
+            self.refreshScripts()
         }
     }
 
@@ -158,11 +167,82 @@ final class AppModel: ObservableObject {
         catch { errorMessage = error.localizedDescription; return false }
     }
 
-    var runningCount: Int { automations.values.filter { $0.process.isRunning }.count }
+    private var allAutomations: [ProjectAutomation] { Array(automations.values) + Array(extraScripts.values) }
+
+    var runningCount: Int { allAutomations.filter { $0.process.isRunning }.count }
 
     var runningProjects: [DevProject] {
-        automations.values.filter { $0.process.isRunning }.map(\.project)
-            .sorted { $0.directoryPath.localizedStandardCompare($1.directoryPath) == .orderedAscending }
+        projects.filter { project in
+            allAutomations.contains { $0.project.directoryPath == project.directoryPath && $0.process.isRunning }
+        }.sorted { $0.directoryPath.localizedStandardCompare($1.directoryPath) == .orderedAscending }
+    }
+
+    /// Keep completed runs visible so their result doesn't disappear with the process.
+    var scriptProjects: [DevProject] {
+        projects.filter { project in
+            !rootSettings.hiddenRepositoryPaths.contains(project.directoryPath) &&
+            allAutomations.contains { $0.project.directoryPath == project.directoryPath && $0.process.state != .idle }
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    func refreshScripts() {
+        var names: [UUID: [String]] = [:]
+        for project in projects {
+            let manifest = try? ProjectDiscovery.scripts(directory: URL(fileURLWithPath: project.directoryPath))
+            var available = Set(manifest?.keys.map { $0 } ?? [])
+            // Retain a removed script while it is running, so it can still be stopped.
+            for (key, automation) in extraScripts where key.projectID == project.id && automation.process.isRunning {
+                available.insert(key.name)
+            }
+            if automation(for: project).process.isRunning, let name = project.arguments.last { available.insert(name) }
+            names[project.id] = available.sorted {
+                let priority = ["dev": 0, "build": 1]
+                let lhs = priority[$0] ?? 2, rhs = priority[$1] ?? 2
+                return lhs == rhs ? $0.localizedStandardCompare($1) == .orderedAscending : lhs < rhs
+            }
+        }
+        scriptNames = names
+    }
+
+    func scriptProcess(for project: DevProject, name: String) -> DevelopmentProcess? {
+        if project.arguments == ["run", name] { return automations[project.id]?.process }
+        return extraScripts[ScriptKey(projectID: project.id, name: name)]?.process
+    }
+
+    func toggleScript(for project: DevProject, name: String) {
+        let key = ScriptKey(projectID: project.id, name: name)
+        let existing = project.arguments == ["run", name] ? automations[project.id] : extraScripts[key]
+        if let existing, existing.process.isRunning {
+            existing.stopManually()
+            return
+        }
+        do {
+            let scripts = try ProjectDiscovery.scripts(directory: URL(fileURLWithPath: project.directoryPath))
+            guard scripts[name] != nil else {
+                throw NSError(domain: "DevWatch", code: 2, userInfo: [NSLocalizedDescriptionKey: "Das Script \(name) ist nicht mehr vorhanden."])
+            }
+            if project.arguments == ["run", name] {
+                automation(for: project).startManually()
+            } else {
+                // These labels are manual actions; only the project's approved default script autostarts.
+                var command = project
+                command.arguments = ["run", name]
+                command.autostartApproval = nil
+                command.autostartPaused = true
+                let runner = existing ?? ProjectAutomation(project: command, persist: { _ in true })
+                runner.configure(command)
+                extraScripts[key] = runner
+                scriptSubscriptions[key] = runner.process.objectWillChange.sink { [weak self] _ in
+                    self?.objectWillChange.send()
+                }
+                refreshOwnership()
+                runner.startManually()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            selectedPath = project.directoryPath
+            openProjectsWindow?()
+        }
     }
 
     func automation(for project: DevProject) -> ProjectAutomation {
@@ -185,7 +265,7 @@ final class AppModel: ObservableObject {
     }
 
     private func refreshOwnership() {
-        for automation in automations.values {
+        for automation in allAutomations {
             let prefix = automation.project.directoryPath + "/"
             automation.excludedDirectories = Set(projects.map(\.directoryPath) + repositories.map(\.directoryPath)).compactMap {
                 $0.hasPrefix(prefix) ? String($0.dropFirst(prefix.count)) : nil
@@ -220,6 +300,7 @@ final class AppModel: ObservableObject {
             _ = automation(for: candidate)
             refreshOwnership()
             automations[candidate.id]?.beginObserving()
+            refreshScripts()
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -273,26 +354,30 @@ final class AppModel: ObservableObject {
     }
 
     func remove(_ project: DevProject) {
-        guard !automation(for: project).process.isRunning else { return }
+        guard !allAutomations.contains(where: { $0.project.directoryPath == project.directoryPath && $0.process.isRunning }) else { return }
         var settings = rootSettings
         if !settings.hiddenRepositoryPaths.contains(project.directoryPath) { settings.hiddenRepositoryPaths.append(project.directoryPath) }
         guard saveRoots(settings) else { return }
         do {
             try persist(projects.filter { $0.id != project.id })
             automations.removeValue(forKey: project.id)?.shutdown()
+            for key in Array(extraScripts.keys) where key.projectID == project.id {
+                extraScripts.removeValue(forKey: key)?.shutdown()
+                scriptSubscriptions.removeValue(forKey: key)
+            }
             refreshOwnership()
             subscriptions.removeValue(forKey: project.id)
             selectedPath = projects.first?.directoryPath
         } catch { errorMessage = error.localizedDescription }
     }
 
-    func stopAll() { automations.values.forEach { $0.stopManually() } }
+    func stopAll() { allAutomations.forEach { $0.stopManually() } }
 
     func shutdown() {
         approvalPrompts = []
         scanTask?.cancel()
         refreshTask?.cancel()
-        automations.values.forEach { $0.shutdown() }
+        allAutomations.forEach { $0.shutdown() }
     }
 
     private func persist(_ updated: [DevProject]) throws {

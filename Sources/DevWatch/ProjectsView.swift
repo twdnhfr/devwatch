@@ -195,6 +195,9 @@ private struct ProjectDetail: View {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(project.name).font(.title.bold())
+                    Text(([project.executable] + project.arguments).joined(separator: " "))
+                        .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                    ScriptLabels(model: model, project: project)
                     Label(process.isRunning ? "Prozess läuft" : (project.autostartEnabled ? "Wartet auf Dateiänderung" : "Gestoppt"),
                           systemImage: "circle.fill")
                         .font(.callout)

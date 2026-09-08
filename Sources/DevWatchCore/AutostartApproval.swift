@@ -14,13 +14,13 @@ public struct AutostartApproval: Codable, Equatable, Sendable {
         public var errorDescription: String? {
             switch self {
             case .unsupportedCommand:
-                return "Autostart benötigt einen Programmnamen oder absoluten Programmpfad mit den Argumenten run dev."
+                return "Autostart benötigt einen Programmnamen oder absoluten Programmpfad mit den Argumenten run dev oder run build."
             case .unreadableManifest:
                 return "Die package.json des Projekts konnte nicht gelesen werden. Bitte Pfad und Zugriffsrechte prüfen."
             case .invalidManifest:
                 return "Die package.json ist ungültig oder enthält keine gültigen Script-Angaben."
             case .missingDevScript:
-                return "Die package.json enthält kein ausführbares dev-Script."
+                return "Die package.json enthält kein ausführbares Script für den gewählten Befehl."
             }
         }
     }
@@ -58,7 +58,8 @@ public struct AutostartApproval: Codable, Equatable, Sendable {
     /// Lists lifecycle scripts for review; actual lifecycle behavior depends on the manager.
     public static func scriptDescription(project: DevProject) throws -> String {
         let (_, _, manifest) = try readManifest(project: project)
-        return ["predev", "dev", "postdev"].compactMap { name in
+        let name = project.arguments[1]
+        return ["pre" + name, name, "post" + name].compactMap { name in
             guard let script = manifest.scripts?[name] else { return nil }
             return "\(name): \(script)"
         }.joined(separator: "\n")
@@ -67,7 +68,7 @@ public struct AutostartApproval: Codable, Equatable, Sendable {
     private static func readManifest(project: DevProject) throws -> (URL, Data, Manifest) {
         guard !project.executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !project.executable.contains("/") || project.executable.hasPrefix("/"),
-              project.arguments == ["run", "dev"] else {
+              (["run", "dev"] == project.arguments || ["run", "build"] == project.arguments) else {
             throw ApprovalError.unsupportedCommand
         }
         let directory = URL(fileURLWithPath: project.directoryPath)
@@ -84,7 +85,7 @@ public struct AutostartApproval: Codable, Equatable, Sendable {
         } catch {
             throw ApprovalError.invalidManifest
         }
-        guard let dev = manifest.scripts?["dev"],
+        guard let dev = manifest.scripts?[project.arguments[1]],
               !dev.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ApprovalError.missingDevScript
         }

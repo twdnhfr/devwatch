@@ -102,6 +102,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func showPopover() {
         guard !shuttingDown, let button = statusItem?.button else { return }
+        model.refreshScripts()
         visiblePromptID = model.approvalPrompts.first?.id
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         installClickMonitors()
@@ -189,12 +190,12 @@ private struct StatusPopoverView: View {
             if let prompt = model.approvalPrompts.first {
                 ActivityApprovalCard(model: model, prompt: prompt)
                     .id(prompt.id)
-            } else if model.runningProjects.isEmpty {
+            } else if model.scriptProjects.isEmpty {
                 Text(model.isScanning ? "Projekte werden gesucht …" : "Wartet auf Dateiänderungen.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            if !model.runningProjects.isEmpty {
+            if !model.scriptProjects.isEmpty {
                 ViewThatFits(in: .vertical) {
                     runningProjectList
                     ScrollView { runningProjectList }.frame(height: 150)
@@ -207,36 +208,26 @@ private struct StatusPopoverView: View {
             }
         }
         .padding(14)
-        .frame(width: 360)
+        .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
     }
 
     private var runningProjectList: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(model.runningProjects) { project in
-                Button {
-                    model.selectedPath = project.directoryPath
-                    model.openProjectsWindow?()
-                } label: {
-                    Label(project.name, systemImage: "circle.fill")
-                        .font(.callout)
-                        .foregroundStyle(.primary)
-                        .labelStyle(RunningProjectLabelStyle())
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
+            ForEach(model.scriptProjects) { project in
+                HStack(spacing: 10) {
+                    Button {
+                        model.selectedPath = project.directoryPath
+                        model.openProjectsWindow?()
+                    } label: {
+                        Text(project.name).font(.callout.weight(.medium))
+                            .lineLimit(1).truncationMode(.middle)
+                            .frame(width: 125, alignment: .leading)
+                    }
+                    .buttonStyle(.plain).help(project.directoryPath)
+                    ScriptLabels(model: model, project: project)
                 }
-                .buttonStyle(.plain)
-                .help(project.directoryPath)
             }
-        }
-    }
-}
-
-private struct RunningProjectLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 8) {
-            configuration.icon.font(.system(size: 7)).foregroundStyle(.green)
-            configuration.title.lineLimit(1).truncationMode(.middle)
         }
     }
 }

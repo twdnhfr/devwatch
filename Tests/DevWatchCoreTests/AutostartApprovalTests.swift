@@ -49,8 +49,18 @@ final class AutostartApprovalTests: XCTestCase {
         changed.arguments = ["run", "build"]
         XCTAssertFalse(approval.matches(project: changed))
         XCTAssertThrowsError(try AutostartApproval.capture(project: changed)) { error in
-            XCTAssertEqual(error as? AutostartApproval.ApprovalError, .unsupportedCommand)
+            XCTAssertEqual(error as? AutostartApproval.ApprovalError, .missingDevScript)
         }
+    }
+
+    func testBuildApprovalIncludesBuildLifecycleAndCannotApproveDev() throws {
+        try writeManifest(#"{"scripts":{"prebuild":"echo before","build":"vite build","postbuild":"echo after","dev":"vite"}}"#)
+        project.arguments = ["run", "build"]
+        let approval = try AutostartApproval.capture(project: project)
+        XCTAssertEqual(try AutostartApproval.scriptDescription(project: project), "prebuild: echo before\nbuild: vite build\npostbuild: echo after")
+        XCTAssertTrue(approval.matches(project: project))
+        project.arguments = ["run", "dev"]
+        XCTAssertFalse(approval.matches(project: project))
     }
 
     func testDifferentDirectoryInvalidatesApprovalEvenWithIdenticalManifest() throws {

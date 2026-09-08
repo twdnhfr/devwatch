@@ -46,12 +46,23 @@ final class ProjectTests: XCTestCase {
     }
 
     func testMissingOrBlankDevScriptIsRejected() throws {
-        for manifest in [#"{}"#, #"{"scripts":{"build":"vite build"}}"#, #"{"scripts":{"dev":"  "}}"#] {
+        for manifest in [#"{}"#, #"{"scripts":{"dev":"  "}}"#] {
             try write("package.json", manifest)
             XCTAssertThrowsError(try ProjectDiscovery.inspect(directory: directory)) { error in
                 XCTAssertEqual(error as? ProjectDiscovery.DiscoveryError, .missingDevScript)
             }
         }
+    }
+
+    func testBuildFallbackSupportsAllPackageManagersAndPrefersDev() throws {
+        for manager in ["bun", "yarn", "npm", "pnpm"] {
+            try write("package.json", "{\"packageManager\":\"\(manager)@1\",\"scripts\":{\"build\":\"vite build\"}}")
+            let project = try ProjectDiscovery.inspect(directory: directory)
+            XCTAssertEqual(project.executable, manager)
+            XCTAssertEqual(project.arguments, ["run", "build"])
+        }
+        try write("package.json", #"{"scripts":{"dev":"vite","build":"vite build"}}"#)
+        XCTAssertEqual(try ProjectDiscovery.inspect(directory: directory).arguments, ["run", "dev"])
     }
 
     func testUnsupportedManagerDoesNotFallBackToLockfiles() throws {

@@ -36,7 +36,7 @@ public enum ProjectDiscovery {
         public var errorDescription: String? {
             switch self {
             case .missingDevScript:
-                return "Die package.json enthält kein ausführbares dev-Script."
+                return "Die package.json enthält kein ausführbares dev- oder build-Script."
             case .unsupportedPackageManager(let manager):
                 return "Der Paketmanager \(manager) wird nicht unterstützt. Unterstützt werden bun, npm, yarn und pnpm."
             case .ambiguousLockfiles(let managers):
@@ -50,13 +50,23 @@ public enum ProjectDiscovery {
         var packageManager: String?
     }
 
+    /// Reads script names for explicit, user-triggered execution; never runs them.
+    public static func scripts(directory: URL) throws -> [String: String] {
+        let data = try Data(contentsOf: directory.appendingPathComponent("package.json"))
+        let manifest = try JSONDecoder().decode(PackageManifest.self, from: data)
+        return (manifest.scripts ?? [:]).filter {
+            !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
     /// Proposes a command without running scripts or installing dependencies.
     public static func inspect(directory: URL) throws -> DevProject {
         let directory = directory.standardizedFileURL.resolvingSymlinksInPath()
         let manifestData = try Data(contentsOf: directory.appendingPathComponent("package.json"))
         let manifest = try JSONDecoder().decode(PackageManifest.self, from: manifestData)
-        guard let script = manifest.scripts?["dev"],
-              !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let scriptName = ["dev", "build"].first(where: {
+            !(manifest.scripts?[$0]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        }) else {
             throw DiscoveryError.missingDevScript
         }
 
@@ -90,7 +100,7 @@ public enum ProjectDiscovery {
             }
             executable = detected.first ?? "npm"
         }
-        return DevProject(directoryPath: directory.path, executable: executable)
+        return DevProject(directoryPath: directory.path, executable: executable, arguments: ["run", scriptName])
     }
 }
 

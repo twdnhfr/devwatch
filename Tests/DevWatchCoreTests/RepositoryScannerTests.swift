@@ -52,9 +52,9 @@ final class RepositoryScannerTests: XCTestCase {
         XCTAssertEqual(Set(result.repositories.map(\.directoryPath)), Set([root.path, visible.path]))
     }
 
-    func testGitRepositoriesWithoutDevScriptRemainVisibleWithIssue() throws {
+    func testGitRepositoriesWithoutSupportedScriptRemainVisibleWithIssue() throws {
         try repository("no-package", manifest: nil)
-        try repository("no-dev", manifest: #"{"scripts":{"build":"vite build"}}"#)
+        try repository("no-dev", manifest: #"{"scripts":{"test":"vitest"}}"#)
         let result = RepositoryScanner.scan(roots: [root.path])
         XCTAssertEqual(result.repositories.count, 2)
         XCTAssertTrue(result.repositories.allSatisfy { $0.project == nil && $0.issue?.isEmpty == false })

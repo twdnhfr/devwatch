@@ -217,6 +217,8 @@ public final class ProjectAutomation: ObservableObject {
             }
             if restart { launch() }
             else { status = "Nach Inaktivität gestoppt" }
+        } else if project.arguments == ["run", "build"], process.errorMessage == nil, project.autostartEnabled {
+            status = "Build abgeschlossen – wartet auf Dateiänderung"
         } else if project.autostartEnabled {
             pause(reason: "Prozess beendet – Autostart pausiert")
         } else if project.autostartPaused == true {

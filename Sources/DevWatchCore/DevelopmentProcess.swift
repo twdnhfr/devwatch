@@ -5,6 +5,12 @@ import Foundation
 /// Owns only processes launched by this instance; never adopts an existing server.
 @MainActor
 public final class DevelopmentProcess: ObservableObject {
+    public enum State: Equatable, Sendable {
+        case idle, running, stopped, succeeded, failed
+    }
+
+    @Published public private(set) var state: State = .idle
+    @Published public private(set) var exitCode: Int32?
     @Published public private(set) var isRunning = false
     @Published public private(set) var log = ""
     @Published public private(set) var errorMessage: String?
@@ -21,6 +27,8 @@ public final class DevelopmentProcess: ObservableObject {
     public func start(directory: URL, executable: String, arguments: [String]) {
         guard !isRunning else { return }
         errorMessage = nil
+        exitCode = nil
+        state = .idle
         log = ""
         requestedStop = false
         let token = UUID()
@@ -51,6 +59,7 @@ public final class DevelopmentProcess: ObservableObject {
                 .first { FileManager.default.isExecutableFile(atPath: $0) }
         }
         guard let resolved, !executable.isEmpty else {
+            state = .failed
             errorMessage = "Programm nicht gefunden: \(executable). Bitte Installation oder absoluten Pfad prüfen."
             return
         }
@@ -58,6 +67,7 @@ public final class DevelopmentProcess: ObservableObject {
             let launched = try ManagedChild.launch(directory: directory, executable: resolved,
                                                    arguments: arguments, environment: environment)
             child = launched.child
+            state = .running
             isRunning = true
             append("Gestartet: \(resolved) \(arguments.joined(separator: " "))\n")
             // A dedicated reader prevents full stdout/stderr pipes from blocking the server.
@@ -85,14 +95,18 @@ public final class DevelopmentProcess: ObservableObject {
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.generation == token else { return }
                     self.child = nil
-                    self.isRunning = false
+                    self.exitCode = status
+                    self.state = self.requestedStop ? .stopped : (status == 0 ? .succeeded : .failed)
                     if !self.requestedStop && status != 0 {
                         self.errorMessage = "Prozess beendet (Status \(status)). Details stehen im Log."
                     }
                     self.append("\nProzess beendet.\n")
+                    // Subscribers to isRunning must already see the final result.
+                    self.isRunning = false
                 }
             }
         } catch {
+            state = .failed
             errorMessage = error.localizedDescription
         }
     }
