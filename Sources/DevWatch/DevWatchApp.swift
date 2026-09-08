@@ -66,6 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Keep project windows available without a Dock or Command-Tab entry.
+        NSApplication.shared.setActivationPolicy(.accessory)
         // Set the running app's icon explicitly, including after a local bundle rebuild.
         if let url = Bundle.main.url(forResource: "DevWatch", withExtension: "icns"),
            let icon = NSImage(contentsOf: url) {
