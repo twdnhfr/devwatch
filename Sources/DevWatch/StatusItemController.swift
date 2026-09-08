@@ -13,6 +13,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private var knownPromptIDs = Set<UUID>()
     private var visiblePromptID: UUID?
     private var shuttingDown = false
+    private var globalClickMonitor: Any?
+    private var localClickMonitor: Any?
 
     init(model: AppModel) {
         self.model = model
@@ -45,6 +47,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         subscription = nil
         appearanceObservation?.invalidate()
         appearanceObservation = nil
+        removeClickMonitors()
         popover.close()
         popover.contentViewController = nil
         if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
@@ -63,7 +66,37 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         guard !shuttingDown, let button = statusItem?.button else { return }
         visiblePromptID = model.approvalPrompts.first?.id
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        installClickMonitors()
         // Deliberately leave the user's active application in the foreground.
+    }
+
+    private func installClickMonitors() {
+        removeClickMonitors()
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        // A non-activating popover may not receive AppKit's usual transient dismissal.
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: clicks) { [weak self] _ in
+            self?.popover.performClose(nil)
+        }
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: clicks) { [weak self] event in
+            guard let self, let window = event.window else { return event }
+            if window == self.statusItem?.button?.window { return event }
+            var ancestor: NSWindow? = window
+            while let current = ancestor {
+                if current == self.popover.contentViewController?.view.window { return event }
+                ancestor = current.parent
+            }
+            // Preserve interactions with the popover's native action menu.
+            if window.level == .popUpMenu { return event }
+            self.popover.performClose(nil)
+            return event
+        }
+    }
+
+    private func removeClickMonitors() {
+        if let globalClickMonitor { NSEvent.removeMonitor(globalClickMonitor) }
+        if let localClickMonitor { NSEvent.removeMonitor(localClickMonitor) }
+        globalClickMonitor = nil
+        localClickMonitor = nil
     }
 
     private func refresh() {
@@ -88,6 +121,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        removeClickMonitors()
         guard !shuttingDown else { return }
         // Closing outside the popover declines only the card actually shown.
         // Existing queued cards remain available on the next manual opening and
