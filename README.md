@@ -150,11 +150,11 @@ Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs 
 
 ### Erste Verwendung
 
-1. Über „Stammordner hinzufügen …“ beispielsweise `~/gits` wählen. Git-Repositories und Worktrees werden rekursiv gefunden. Alternativ über „Weitere Aktionen“ ein einzelnes Webprojekt hinzufügen.
-2. Den vorgeschlagenen Paketmanager und das `dev`-Script des Projekts prüfen.
+1. Über das Ordnersymbol links unten „Ordner hinzufügen …“ öffnen und beispielsweise `~/gits` wählen. Git-Repositories und Worktrees werden rekursiv gefunden. Alternativ im Menü der Ordnerverwaltung ein einzelnes Webprojekt hinzufügen.
+2. Ein Projekt in der durchsuchbaren Liste auswählen. Einstellungen und Ausgaben stehen bei Bedarf unter „Details & Logs“.
 3. Falls erforderlich den Programmnamen durch einen absoluten Pfad ersetzen und speichern.
 4. Noch nicht freigegebene Projekte werden zunächst nur beobachtet. Bei der ersten relevanten Dateiänderung erscheint ein Hinweis direkt am Menüleisten-Icon mit Projekt, Befehl und Script-Vorschau. Ein Klick auf „Autostart freigeben …“ im Hinweis erteilt die Freigabe und startet den Prozess sofort.
-5. Alternativ im Projektfenster „Autostart freigeben …“ verwenden: Dort startet die Freigabe allein nichts; erst eine folgende Dateiänderung startet den Prozess. „Starten“ bleibt als manuelle Aktion verfügbar.
+5. Alternativ im Projektfenster den Schalter „Autostart“ einschalten: Dort startet die Freigabe allein nichts; erst eine folgende Dateiänderung startet den Prozess. „Starten“ bleibt als manuelle Aktion verfügbar.
 6. Mit „Stoppen“ beenden und den Autostart pausieren. Eine Pause bleibt über App-Neustarts erhalten. „Autostart pausieren“ lässt einen bereits laufenden Prozess weiterlaufen.
 7. Zum Fortsetzen erneut freigeben. Das Schließen des Fensters lässt die App in der Menüleiste weiterlaufen; „DevWatch beenden“ beendet Beobachtung und Prozesse, ohne eine zuvor aktive Freigabe zu pausieren.
 
@@ -171,7 +171,7 @@ Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 45 Tests be
 - Der Entwicklungsbefehl verwendet derzeit die Argumente `run dev`; der Programmname beziehungsweise Programmpfad ist editierbar.
 - Stammordner werden beim App-Start, auf Knopfdruck und alle 30 Sekunden im Hintergrund geprüft. Auch Git-Projekte ohne `package.json` beziehungsweise ohne gültiges `dev`-Script werden angezeigt, allerdings ohne Startmöglichkeit.
 - Verschachtelte Git-Repositories, Worktree-/Submodul-Verweise per `.git`-Datei und überlappende Stammordner werden berücksichtigt. Symlink-Unterverzeichnisse sowie Abhängigkeits-, Build- und Cache-Ordner werden übersprungen; bare Git-Repositories ohne `.git`-Marker werden nicht erkannt.
-- Bestehende Projektbefehle, IDs und Freigaben bleiben beim Scan erhalten. Das Entfernen eines Stammordners beendet dessen Scans und behält bereits übernommene startbare Projekte. „Projekt ausblenden“ verhindert, dass ein Eintrag beim nächsten Scan erneut erscheint; „Weitere Aktionen“ kann ausgeblendete Projekte wieder anzeigen.
+- Bestehende Projektbefehle, IDs und Freigaben bleiben beim Scan erhalten. Das Entfernen eines Stammordners beendet dessen Scans und behält bereits übernommene startbare Projekte. „Details & Logs“ → „Ausblenden …“ verhindert, dass ein Eintrag beim nächsten Scan erneut erscheint; Das Menü der Ordnerverwaltung kann ausgeblendete Projekte wieder anzeigen.
 - Registrierte verschachtelte Projekte werden dem jeweils tieferen Projekt zugeordnet. Nicht lesbare Suchordner oder Einträge werden als Warnung angezeigt.
 - Die Erkennung bevorzugt `packageManager`; ohne diese Angabe werden `bun.lock`/`bun.lockb`, `yarn.lock`, `package-lock.json`/`npm-shrinkwrap.json` und `pnpm-lock.yaml` geprüft. Mehrere unterschiedliche Manager führen zu einem Hinweis. Ohne Angaben wird npm vorgeschlagen. Die Installation von Abhängigkeiten erfolgt nicht automatisch.
 - Jede Änderung an `package.json` erfordert eine neue Freigabe, auch eine reine Formatierungsänderung. Die Prüfung erfolgt vor jedem automatischen Start und beim erneuten Beobachten nach einem App-Neustart. Veränderte Quellcodedateien benötigen keine neue Freigabe.
@@ -185,3 +185,5 @@ Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 45 Tests be
 
 - [Apple: MenuBarExtra](https://developer.apple.com/documentation/swiftui/menubarextra) für die native Menüleiste.
 - [Apple: Swift Package Targets](https://developer.apple.com/documentation/PackageDescription/Target) für die Aufteilung in App, Kernmodul und Tests.
+
+Die Oberfläche ist bewusst reduziert: Projektname, Status, Autostart-Schalter und ein gemeinsamer Start-/Stopp-Knopf. Logs, Pfade und Befehlseinstellungen sind standardmäßig eingeklappt. Das Menüleisten-Popup zeigt direkt nur Projekt, Befehl und Freigabeaktion; technische Angaben stehen unter „Details“. Hauptansicht, Detailbereich und Ordnerverwaltung wurden nach dem Umbau im Release-Build visuell geprüft.

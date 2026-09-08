@@ -5,84 +5,73 @@ import SwiftUI
 struct ProjectsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
+    @State private var search = ""
+    @State private var showFolders = false
+
+    private var visibleRepositories: [DiscoveredRepository] {
+        model.listedRepositories.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
+    }
 
     var body: some View {
         NavigationSplitView {
             List(selection: $model.selectedPath) {
-                Section("STAMMORDNER") {
-                    ForEach(model.rootSettings.paths, id: \.self) { path in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Label(URL(fileURLWithPath: path).lastPathComponent, systemImage: "folder.badge.gearshape")
-                            Text(path).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        .help(path)
-                        .contextMenu {
-                            Button("Stammordner entfernen (Projekte behalten)") { model.removeRoot(path) }
-                        }
-                    }
-                    Button(action: model.addRootFolder) {
-                        Label("Stammordner hinzufügen …", systemImage: "plus")
-                    }.buttonStyle(.plain)
-                }
-                Section("PROJEKTE · \(model.listedRepositories.count)") {
-                    ForEach(model.listedRepositories) { repository in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Label(repository.name, systemImage: repository.project == nil ? "folder.badge.questionmark" : "folder")
-                            Text(repository.project.map { "\($0.executable) run dev" } ?? "Kein dev-Befehl")
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
+                ForEach(visibleRepositories) { repository in
+                    Text(repository.name)
+                        .foregroundStyle(repository.project == nil ? .secondary : .primary)
                         .tag(repository.directoryPath)
                         .help(repository.directoryPath)
-                    }
                 }
             }
-            .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+            .searchable(text: $search, placement: .sidebar, prompt: "Projekt suchen")
+            .navigationSplitViewColumnWidth(min: 190, ideal: 220)
             .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 8) {
-                    Button(action: model.rescan) {
-                        Label(model.isScanning ? "Suche läuft …" : "Jetzt aktualisieren", systemImage: "arrow.clockwise")
-                            .frame(maxWidth: .infinity)
-                    }.disabled(model.isScanning)
-                    Menu("Weitere Aktionen") {
-                        Button("Einzelnes Projekt hinzufügen …", action: model.addProject)
-                        if !model.rootSettings.hiddenRepositoryPaths.isEmpty {
-                            Button("Ausgeblendete Projekte wieder anzeigen", action: model.showHiddenRepositories)
-                        }
+                HStack {
+                    Button { showFolders = true } label: {
+                        Image(systemName: "folder.badge.gearshape")
+                    }.help("Stammordner verwalten").accessibilityLabel("Stammordner verwalten")
+                    Text("\(model.listedRepositories.count) Projekte")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    if model.isScanning {
+                        ProgressView().controlSize(.small).accessibilityLabel("Projekte werden gesucht")
+                    } else {
+                        Button(action: model.rescan) { Image(systemName: "arrow.clockwise") }
+                            .help("Projekte aktualisieren").accessibilityLabel("Projekte aktualisieren")
                     }
-                    if !model.scanWarnings.isEmpty {
-                        Text(model.scanWarnings.joined(separator: "\n"))
-                            .font(.caption).foregroundStyle(.orange).textSelection(.enabled)
-                    }
-                }.padding(12).background(.bar)
+                }.buttonStyle(.borderless).padding(12).background(.bar)
             }
         } detail: {
             if let repository = model.listedRepositories.first(where: { $0.directoryPath == model.selectedPath }),
                let issue = repository.issue {
                 VStack(alignment: .leading, spacing: 16) {
-                    Label(repository.name, systemImage: "folder").font(.largeTitle.bold())
-                    Text(repository.directoryPath).foregroundStyle(.secondary).textSelection(.enabled)
-                    Label("Git-Projekt erkannt", systemImage: "checkmark.circle")
-                    Text(issue).textSelection(.enabled)
-                    Text("Das Repository bleibt sichtbar. Sobald ein gültiges dev-Script vorhanden ist, erscheint beim nächsten Scan der Startbefehl.")
-                        .foregroundStyle(.secondary)
-                    Button("Erneut prüfen", action: model.rescan).disabled(model.isScanning)
+                    Text(repository.name).font(.title.bold())
+                    Text("Kein Entwicklungsbefehl erkannt.").foregroundStyle(.secondary)
+                    DisclosureGroup("Details") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(repository.directoryPath).textSelection(.enabled)
+                            Text(issue).textSelection(.enabled)
+                            Button("Erneut prüfen", action: model.rescan).disabled(model.isScanning)
+                        }.font(.callout).padding(.top, 10)
+                    }
                     if let saved = model.projects.first(where: { $0.directoryPath == repository.directoryPath }),
                        model.automation(for: saved).process.isRunning {
-                        Button("Laufenden Prozess stoppen") { model.automation(for: saved).stopManually() }
+                        Button("Stoppen") { model.automation(for: saved).stopManually() }
                     }
                     Spacer()
-                }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+                }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
             } else if let project = model.projects.first(where: { $0.directoryPath == model.selectedPath }) {
-                ProjectDetail(project: project, automation: model.automation(for: project), process: model.automation(for: project).process, model: model)
+                ProjectDetail(project: project, automation: model.automation(for: project),
+                              process: model.automation(for: project).process, model: model)
                     .id(project.id)
             } else {
                 ContentUnavailableView {
-                    Label(model.isScanning ? "Git-Projekte werden gesucht" : "Deine Projekte, automatisch", systemImage: "folder.badge.gearshape")
+                    Label("Deine Projekte", systemImage: "folder")
                 } description: {
-                    Text("Wähle einen Stammordner wie ~/gits. DevWatch findet darin Git-Repositories und Worktrees – auch ohne Frontend-Script.")
+                    Text(model.rootSettings.paths.isEmpty ? "Wähle einmal deinen Git-Ordner." : "Wähle links ein Projekt aus.")
                 } actions: {
-                    Button("Stammordner auswählen …", action: model.addRootFolder)
-                        .buttonStyle(.borderedProminent)
+                    if model.rootSettings.paths.isEmpty {
+                        Button("Ordner auswählen …", action: model.addRootFolder).buttonStyle(.borderedProminent)
+                    }
                 }
             }
         }
@@ -93,13 +82,56 @@ struct ProjectsView: View {
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: 660, minHeight: 400)
+        .sheet(isPresented: $showFolders) { foldersSheet }
         .alert("Aktion nicht möglich", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
         )) {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
+    }
+
+    private var foldersSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Projektordner").font(.title2.bold())
+            Text("DevWatch findet die Git-Projekte darin automatisch.").foregroundStyle(.secondary)
+            if model.rootSettings.paths.isEmpty {
+                Text("Noch kein Ordner hinzugefügt.").font(.callout)
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(model.rootSettings.paths, id: \.self) { path in
+                            HStack {
+                                Text(path).font(.callout).textSelection(.enabled)
+                                Spacer()
+                                Button { model.removeRoot(path) } label: { Image(systemName: "minus.circle") }
+                                    .help("Stammordner entfernen; Projekte behalten")
+                                    .accessibilityLabel("Stammordner \(path) entfernen")
+                            }
+                        }
+                    }
+                }.frame(height: 110)
+            }
+            if !model.scanWarnings.isEmpty {
+                ScrollView { Text(model.scanWarnings.joined(separator: "\n")).font(.caption).foregroundStyle(.orange) }
+                    .frame(height: 80)
+            }
+            HStack {
+                Button("Ordner hinzufügen …", action: model.addRootFolder)
+                Menu {
+                    Button("Einzelnes Projekt hinzufügen …") {
+                        DispatchQueue.main.async { model.addProject() }
+                    }
+                    if !model.rootSettings.hiddenRepositoryPaths.isEmpty {
+                        Button("Ausgeblendete Projekte anzeigen", action: model.showHiddenRepositories)
+                    }
+                } label: { Image(systemName: "ellipsis") }
+                    .menuStyle(.borderlessButton).fixedSize().help("Weitere Aktionen")
+                Spacer()
+                Button("Fertig") { showFolders = false }.keyboardShortcut(.defaultAction)
+            }
+        }.padding(24).frame(width: 470)
     }
 }
 
@@ -109,6 +141,7 @@ private struct ProjectDetail: View {
     @ObservedObject var process: DevelopmentProcess
     @ObservedObject var model: AppModel
     @State private var executable = ""
+    @State private var showDetails = false
     @State private var showRemoveConfirmation = false
     private struct ApprovalRequest: Identifiable {
         let id = UUID()
@@ -118,115 +151,80 @@ private struct ProjectDetail: View {
     @State private var approvalRequest: ApprovalRequest?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(project.name).font(.largeTitle.bold())
-                    Text(project.directoryPath)
-                        .font(.caption).foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(project.name).font(.title.bold())
+                    Label(process.isRunning ? "Prozess läuft" : (project.autostartEnabled ? "Wartet auf Dateiänderung" : "Gestoppt"),
+                          systemImage: "circle.fill")
+                        .font(.callout)
+                        .foregroundStyle(process.isRunning ? Color.green : Color.secondary)
                 }
-                Spacer()
-                Label(process.isRunning ? "Prozess läuft" : "Gestoppt",
-                      systemImage: process.isRunning ? "circle.fill" : "circle")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(process.isRunning ? Color.green : Color.secondary)
-            }
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Entwicklungsbefehl").font(.headline)
-                        Spacer()
-                        Text(project.autostartEnabled ? "Autostart aktiv" : "Manueller Start").font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 18) {
+                    Toggle("Autostart", isOn: Binding(
+                        get: { project.autostartEnabled },
+                        set: { if $0 { prepareApproval() } else { automation.pause() } }
+                    )).toggleStyle(.switch).fixedSize()
+                        .disabled(executable != project.executable)
+                    Spacer()
+                    Button(process.isRunning ? "Stoppen" : "Starten") {
+                        if process.isRunning { automation.stopManually() }
+                        else { automation.startManually() }
                     }
-                    HStack {
-                        TextField("Programm oder absoluter Pfad", text: $executable)
-                            .textFieldStyle(.roundedBorder)
-                            .disabled(process.isRunning)
-                            .onSubmit(saveExecutable)
-                        Text(project.arguments.joined(separator: " "))
-                            .font(.system(.body, design: .monospaced))
-                        Button("Speichern", action: saveExecutable)
-                            .disabled(process.isRunning || executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || executable == project.executable)
-                    }
-                    Text(automation.status)
-                        .font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        Button {
-                            automation.startManually()
-                        } label: { Label("Starten", systemImage: "play.fill") }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(process.isRunning || executable != project.executable)
-                        Button { automation.stopManually() } label: { Label("Stoppen", systemImage: "stop.fill") }
-                            .disabled(!process.isRunning)
-                        Spacer()
-                        Button("Im Finder") {
-                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: project.directoryPath)
-                        }
-                    }
-                    Divider()
-                    HStack {
-                        if project.autostartEnabled {
-                            Button("Autostart pausieren") { automation.pause() }
-                        } else {
-                            Button("Autostart freigeben …", action: prepareApproval)
-                                .disabled(executable != project.executable)
-                        }
-                        Spacer()
-                        Text("Auslöser: Dateiänderung").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let change = automation.lastChange {
-                        Text("Letzte Änderung: \(change)")
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                }.padding(8)
-            }
-
-            if let error = process.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.callout).foregroundStyle(.red).textSelection(.enabled)
-            }
-
-            HStack {
-                Text("Prozessausgabe").font(.headline)
-                Spacer()
-                Text("Erreichbarkeit noch nicht geprüft").font(.caption).foregroundStyle(.secondary)
-            }
-            GeometryReader { geometry in
-                ScrollView([.vertical, .horizontal]) {
-                    Text(process.log.isEmpty ? "Noch keine Ausgabe. Starte den Entwicklungsserver, um seine Logs zu sehen." : process.log)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(process.log.isEmpty ? .secondary : .primary)
-                        .textSelection(.enabled)
-                        .padding(12)
-                        .frame(minWidth: geometry.size.width, minHeight: geometry.size.height, alignment: .topLeading)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!process.isRunning && executable != project.executable)
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-            HStack {
-                Spacer()
-                Button("Projekt ausblenden …", role: .destructive) { showRemoveConfirmation = true }
-                    .disabled(process.isRunning)
-            }
+                if let error = process.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(.red).textSelection(.enabled)
+                } else if automation.status.contains("fehlgeschlagen") || automation.status.contains("erneut") || automation.status.contains("verschoben") {
+                    Text(automation.status).font(.callout).foregroundStyle(.orange)
+                }
+                Divider()
+                DisclosureGroup("Details & Logs", isExpanded: $showDetails) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(project.directoryPath).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        HStack {
+                            TextField("Programm oder Pfad", text: $executable)
+                                .textFieldStyle(.roundedBorder).disabled(process.isRunning).onSubmit(saveExecutable)
+                            Text(project.arguments.joined(separator: " ")).font(.system(.caption, design: .monospaced))
+                            Button("Speichern", action: saveExecutable)
+                                .disabled(process.isRunning || executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || executable == project.executable)
+                        }
+                        Text(automation.status).font(.caption).foregroundStyle(.secondary)
+                        if let change = automation.lastChange {
+                            Text("Letzte Änderung: \(change)").font(.caption).textSelection(.enabled)
+                        }
+                        ScrollView([.vertical, .horizontal]) {
+                            Text(process.log.isEmpty ? "Noch keine Ausgabe." : process.log)
+                                .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                                .padding(10).frame(minWidth: 330, minHeight: 150, alignment: .topLeading)
+                        }
+                        .frame(height: 170)
+                        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                        HStack {
+                            Button("Im Finder") {
+                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: project.directoryPath)
+                            }
+                            Spacer()
+                            Button("Ausblenden …", role: .destructive) { showRemoveConfirmation = true }
+                                .disabled(process.isRunning)
+                        }
+                    }.padding(.top, 14)
+                }
+            }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(24)
         .onAppear { executable = project.executable }
         .sheet(item: $approvalRequest) { request in
             VStack(alignment: .leading, spacing: 16) {
-                Text("Autostart freigeben").font(.title2.bold())
-                Text("Bei relevanten Dateiänderungen führt DevWatch diesen Befehl in \(project.name) aus. Die Freigabe startet noch keinen Prozess.")
-                    .fixedSize(horizontal: false, vertical: true)
+                Text("Autostart für \(project.name)?").font(.title2.bold())
+                Text("Startet bei der nächsten Dateiänderung.").foregroundStyle(.secondary)
                 Text(([project.executable] + project.arguments).joined(separator: " "))
                     .font(.system(.body, design: .monospaced)).textSelection(.enabled)
                 ScrollView {
                     Text(request.script).font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                }.frame(height: 120)
-                Text("Änderungen an package.json oder am Befehl erfordern eine neue Freigabe. Stoppen pausiert den Autostart.")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                }.frame(height: 70)
                 HStack {
                     Spacer()
                     Button("Abbrechen") { approvalRequest = nil }
@@ -235,10 +233,9 @@ private struct ProjectDetail: View {
                         approvalRequest = nil
                     }.buttonStyle(.borderedProminent)
                 }
-            }.padding(24).frame(width: 490)
+            }.padding(24).frame(width: 400)
         }
-        .confirmationDialog("Projekt ausblenden? Die Dateien bleiben erhalten. Du kannst ausgeblendete Projekte über „Weitere Aktionen“ wieder anzeigen.",
-                            isPresented: $showRemoveConfirmation) {
+        .confirmationDialog("Projekt ausblenden? Die Dateien bleiben erhalten.", isPresented: $showRemoveConfirmation) {
             Button("Ausblenden", role: .destructive) { model.remove(project) }
         }
     }

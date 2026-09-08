@@ -11,7 +11,7 @@ struct DevWatchApp: App {
             ProjectsView(model: model)
                 .onAppear { delegate.configure(model: model) }
         }
-        .defaultSize(width: 920, height: 620)
+        .defaultSize(width: 760, height: 460)
 
 
     }

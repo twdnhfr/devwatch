@@ -23,7 +23,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         item.button?.action = #selector(togglePopover)
         popover.behavior = .transient
         popover.delegate = self
-        popover.contentViewController = NSHostingController(rootView: StatusPopoverView(model: model))
+        let content = NSHostingController(rootView: StatusPopoverView(model: model))
+        content.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = content
         subscription = model.objectWillChange.sink { [weak self] _ in
             // ObservableObject publishes before its properties have been updated.
             DispatchQueue.main.async { [weak self] in self?.refresh() }
@@ -74,7 +76,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let promptHint = model.approvalPrompts.isEmpty ? "" : " · Freigabe wartet"
         button.toolTip = "DevWatch: \(status)\(promptHint)"
         button.setAccessibilityLabel("DevWatch: \(status)\(promptHint)")
-        popover.contentSize = NSSize(width: 440, height: model.approvalPrompts.isEmpty ? 225 : 570)
 
         let ids = Set(model.approvalPrompts.map(\.id))
         let newIDs = ids.subtracting(knownPromptIDs)
@@ -104,7 +105,7 @@ private struct StatusPopoverView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("DevWatch").font(.headline)
                 Spacer()
@@ -114,67 +115,78 @@ private struct StatusPopoverView: View {
                     .foregroundStyle(model.runningCount > 0 ? Color.green : Color.secondary)
             }
             if let prompt = model.approvalPrompts.first {
-                approvalCard(prompt)
+                ActivityApprovalCard(model: model, prompt: prompt)
+                    .id(prompt.id)
             } else {
-                Text("DevWatch beobachtet deine Projekte und fragt bei der ersten relevanten Änderung nach der Freigabe.")
+                Text(model.isScanning ? "Projekte werden gesucht …" : "Wartet auf Dateiänderungen.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
             Divider()
             HStack {
-                Button("Projekte öffnen …") { model.openProjectsWindow?() }
+                Button("Projekte …") { model.openProjectsWindow?() }
                 Spacer()
-                Button("Alle stoppen") { model.stopAll() }
-                    .disabled(model.runningCount == 0)
-            }
-            HStack {
                 if model.approvalPrompts.count > 1 {
-                    Text("\(model.approvalPrompts.count - 1) weitere Freigaben warten")
+                    Text("\(model.approvalPrompts.count - 1) weitere")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Spacer()
-                Button("DevWatch beenden") { NSApp.terminate(nil) }
-                    .buttonStyle(.link)
-                    .font(.caption)
+                Menu {
+                    if model.runningCount > 0 {
+                        Button("Alle stoppen") { model.stopAll() }
+                        Divider()
+                    }
+                    Button("Beenden") { NSApp.terminate(nil) }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .accessibilityLabel("Weitere Aktionen")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
             }
         }
-        .padding(18)
-        .frame(width: 440)
+        .padding(14)
+        .frame(width: 360)
+        .fixedSize(horizontal: false, vertical: true)
     }
+}
 
-    private func approvalCard(_ prompt: ActivityApprovalPrompt) -> some View {
+private struct ActivityApprovalCard: View {
+    @ObservedObject var model: AppModel
+    let prompt: ActivityApprovalPrompt
+    @State private var detailsExpanded = false
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Dateiänderung erkannt").font(.subheadline).foregroundStyle(.secondary)
-            Text(prompt.project.name).font(.title3.bold())
-            Text(prompt.project.directoryPath)
-                .font(.caption).foregroundStyle(.secondary)
+            Text(prompt.project.name)
+                .font(.title3.bold())
+                .lineLimit(2)
+            Text(([prompt.project.executable] + prompt.project.arguments).joined(separator: " "))
+                .font(.system(.callout, design: .monospaced))
                 .textSelection(.enabled)
                 .lineLimit(2)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Geänderte Dateien").font(.caption.bold())
-                    Text(prompt.changedFiles.prefix(4).joined(separator: "\n"))
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                    if prompt.changedFiles.count > 4 {
-                        Text("… und \(prompt.changedFiles.count - 4) weitere")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Text("Auszuführender Befehl").font(.caption.bold())
-                    Text(([prompt.project.executable] + prompt.project.arguments).joined(separator: " "))
-                        .font(.system(.callout, design: .monospaced).bold())
-                        .textSelection(.enabled)
-                    Text(prompt.script)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(height: 160)
-
-            Text("Freigeben startet den Entwicklungsserver jetzt.")
+            Text("Änderung erkannt. Freigeben startet jetzt.")
                 .font(.caption).foregroundStyle(.secondary)
+            DisclosureGroup("Details", isExpanded: $detailsExpanded) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(prompt.project.directoryPath)
+                            .foregroundStyle(.secondary)
+                        Text("Geänderte Dateien").bold()
+                        Text(prompt.changedFiles.joined(separator: "\n"))
+                            .font(.system(.caption, design: .monospaced))
+                        Text("Befehl und Scripts").bold()
+                        Text(([prompt.project.executable] + prompt.project.arguments).joined(separator: " ") + "\n" + prompt.script)
+                            .font(.system(.caption, design: .monospaced))
+                    }
+                    .font(.caption)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 6)
+                }
+                .frame(height: 140)
+            }
+            .font(.caption)
             HStack {
                 Button("Später") { model.dismissActivity(prompt) }
                 Spacer()
@@ -182,7 +194,5 @@ private struct StatusPopoverView: View {
                     .buttonStyle(.borderedProminent)
             }
         }
-        .padding(12)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
     }
 }
