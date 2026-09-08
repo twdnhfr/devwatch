@@ -108,40 +108,55 @@ struct ProjectsView: View {
                 Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
             }
             Divider()
-            Text("Projektordner").font(.headline)
-            Text("DevWatch findet die Git-Projekte darin automatisch.").foregroundStyle(.secondary)
-            if model.rootSettings.paths.isEmpty {
-                Text("Noch kein Ordner hinzugefügt.").font(.callout)
-            } else {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(model.rootSettings.paths, id: \.self) { path in
-                            HStack {
-                                Text(path).font(.callout).textSelection(.enabled)
-                                Spacer()
-                                Button { model.removeRoot(path) } label: { Image(systemName: "minus.circle") }
-                                    .help("Stammordner entfernen; Projekte behalten")
-                                    .accessibilityLabel("Stammordner \(path) entfernen")
+            HStack {
+                Text("Projektordner").font(.headline)
+                Spacer()
+                Button(action: model.addRootFolder) {
+                    Image(systemName: "plus")
+                }
+                .help("Ordner hinzufügen")
+                .accessibilityLabel("Ordner hinzufügen")
+            }
+            VStack(spacing: 0) {
+                if model.rootSettings.paths.isEmpty {
+                    Text("Mit + einen Ordner hinzufügen")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(model.rootSettings.paths, id: \.self) { path in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "folder").foregroundStyle(.secondary)
+                                    Text(path).font(.callout).lineLimit(1)
+                                        .truncationMode(.middle).help(path)
+                                    Spacer(minLength: 0)
+                                    Button { model.removeRoot(path) } label: {
+                                        Image(systemName: "minus")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("Ordner aus der Liste entfernen; Projekte behalten")
+                                    .accessibilityLabel("Ordner \(path) entfernen")
+                                }
+                                .padding(.horizontal, 12).frame(height: 40)
+                                if path != model.rootSettings.paths.last {
+                                    Divider().padding(.leading, 12)
+                                }
                             }
                         }
                     }
-                }.frame(height: 110)
+                    .frame(height: min(CGFloat(model.rootSettings.paths.count) * 41, 164))
+                }
             }
+            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+            Text("Git-Projekte darin werden automatisch erkannt.")
+                .font(.caption).foregroundStyle(.secondary)
             if !model.scanWarnings.isEmpty {
                 ScrollView { Text(model.scanWarnings.joined(separator: "\n")).font(.caption).foregroundStyle(.orange) }
                     .frame(height: 80)
             }
             HStack {
-                Button("Ordner hinzufügen …", action: model.addRootFolder)
-                Menu {
-                    Button("Einzelnes Projekt hinzufügen …") {
-                        DispatchQueue.main.async { model.addProject() }
-                    }
-                    if !model.rootSettings.hiddenRepositoryPaths.isEmpty {
-                        Button("Ausgeblendete Projekte anzeigen", action: model.showHiddenRepositories)
-                    }
-                } label: { Image(systemName: "ellipsis") }
-                    .menuStyle(.borderlessButton).fixedSize().help("Weitere Aktionen")
                 Spacer()
                 Button("Fertig") { model.showFolders = false }.keyboardShortcut(.defaultAction)
             }
