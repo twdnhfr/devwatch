@@ -1,0 +1,131 @@
+# DevWatch
+
+Arbeitstitel für eine native macOS-App in Swift, die lokale Entwicklungsprozesse automatisch startet, sobald sich relevante Dateien in einem freigegebenen Projekt ändern.
+
+## Projektidee
+
+Bei der lokalen PHP- und Laravel-Entwicklung läuft Laravel Herd im Hintergrund und stellt die grundlegende Entwicklungsumgebung bereit. Die Arbeit am Code findet häufig ausschließlich über einen KI-Agenten im Terminal statt. Frontend-Prozesse wie `bun run dev` müssen bisher zusätzlich von Hand gestartet und im Blick behalten werden.
+
+DevWatch soll diese Lücke schließen: Sobald ein Entwickler oder ein KI-Agent eine relevante Datei verändert, startet die App den zuvor freigegebenen Entwicklungsbefehl des Projekts. Eine kleine Oberfläche in der macOS-Menüleiste zeigt laufende Projekte und Fehler an und erlaubt manuelle Eingriffe.
+
+Die App ergänzt Herd. Sie verwaltet in V1 weder PHP noch Datenbanken und benötigt keine Integration in einen bestimmten KI-Agenten.
+
+## Vereinbarter Umfang für V1
+
+- Native macOS-App mit Swift und SwiftUI, bedienbar über die Menüleiste.
+- Lokale Verarbeitung; für die Kernfunktion sind weder Cloudkonto noch Backend erforderlich.
+- Nutzer wählen einen oder mehrere Ordner mit ihren Entwicklungsprojekten aus.
+- Projekte mit `package.json` und einem geeigneten Entwicklungsscript werden erkannt. Git-Worktrees sollen als eigenständige Arbeitsverzeichnisse berücksichtigt werden.
+- Die App schlägt anhand von Scripts, `packageManager` und Lockfiles einen Befehl vor, beispielsweise `bun run dev`, `npm run dev`, `yarn run dev` oder `pnpm run dev`. Mehrdeutige Angaben werden angezeigt und können korrigiert werden.
+- Jedes Projekt und sein Startbefehl werden einmal ausdrücklich für den Autostart freigegeben. Das bloße Entdecken eines Repositorys führt keinen Code aus.
+- Die erste relevante Dateiänderung startet den freigegebenen Befehl im jeweiligen Projektverzeichnis.
+- Änderungen werden kurz gebündelt; als Ausgangswert ist etwa eine Sekunde vorgesehen.
+- Ein bereits laufender Entwicklungsserver wird durch weitere Dateiänderungen nicht erneut gestartet. Das Nachladen übernimmt der Entwicklungsserver.
+- Mehrere Projekte können gleichzeitig laufen.
+- Menüaktionen: Start, Stop, Neustart, Logs anzeigen und Website öffnen, sofern eine URL bekannt ist.
+- Ein manueller Stopp pausiert den Autostart dieses Projekts bis zur ausdrücklichen Reaktivierung.
+- Beim Beenden der App werden die von ihr gestarteten Prozesse einschließlich ihrer Kindprozesse sauber beendet.
+
+`dev` und `build` sind unterschiedliche Aufgaben: Bei üblichen Vite-Projekten startet `dev` einen dauerhaften Entwicklungsserver, während `build` einmalig fertige Assets erzeugt. V1 konzentriert sich auf laufende Entwicklungsprozesse. Maßgeblich bleibt die tatsächliche Scriptdefinition des Projekts.
+
+## Auslöser und Grenzen
+
+Relevant sind Änderungen an Quellcode und Projektkonfiguration, ausdrücklich auch PHP- und Blade-Dateien. Erstellen, Ändern, Löschen und Umbenennen sollen berücksichtigt werden. Die genaue Filterlogik wird im Prototyp geprüft.
+
+Ausgeschlossen werden insbesondere:
+
+- Git-Metadaten in `.git`
+- Abhängigkeiten in `node_modules` und `vendor`
+- Logs, Caches und Laufzeitdaten, beispielsweise `storage` und `bootstrap/cache` bei Laravel
+- Generierte Assets wie `public/build` und `dist`
+- Laufzeitmarker wie Laravels `public/hot`
+- Temporäre Dateien von Editoren und Betriebssystem
+
+Das erstmalige Erfassen eines Ordners zählt nicht als Dateiänderung. Ausgaben eines gestarteten Prozesses dürfen keine Startschleife auslösen.
+
+Ein `git pull` oder Branchwechsel kann relevante Dateien verändern und damit den Server starten. Das ist für aktivierte Projekte in V1 eine akzeptierte Grenze. Reines Lesen eines Projekts löst keinen Start aus; dafür bleibt der manuelle Start verfügbar.
+
+Nicht vorgesehen sind eine Shell-Integration, das Erkennen eines Verzeichniswechsels im Terminal oder das Auslesen von Agentensitzungen. Automatisches Stoppen bei vermeintlicher Inaktivität gehört ebenfalls nicht zu V1, weil fehlende Dateiänderungen keine zuverlässige Aussage über die Nutzung im Browser erlauben.
+
+## Technischer Entwurf
+
+Der folgende Aufbau ist ein erster Vorschlag, noch keine implementierte Architektur:
+
+| Baustein | Aufgabe |
+| --- | --- |
+| SwiftUI-Oberfläche mit `MenuBarExtra` | Projektstatus, Aktionen, Einstellungen und Logs |
+| Projektverwaltung | Ordner erfassen, Scripts erkennen, Befehle und Freigaben lokal speichern |
+| Dateibeobachtung | Dateiereignisse empfangen, filtern und pro Projekt bündeln; FSEvents als Kandidat prüfen |
+| Prozessverwaltung | Befehle im richtigen Arbeitsverzeichnis starten, Ausgabe erfassen und eigene Prozessbäume beenden |
+| Zustandsverwaltung | Gleichzeitige Starts verhindern und Start, Bereitschaft, Fehler und Pause unterscheiden |
+
+Sinnvolle Zustände sind: bereit für Autostart, startet, läuft, Fehler und pausiert. Die Freigabe des Projekts wird unabhängig vom Prozessstatus gespeichert.
+
+Besonders zu prüfen sind die Auflösung von Bun-/Node-Pfaden und projektspezifischen Versionen: Eine aus dem Finder gestartete App hat nicht automatisch dieselbe Umgebung wie ein interaktives Terminal. Außerdem müssen Portkonflikte und bereits außerhalb der App gestartete Server sichtbar behandelt werden. Fremde Prozesse werden nicht automatisch beendet oder übernommen.
+
+Ein gestarteter Prozess gilt nicht allein deshalb als erreichbarer Server. Für den ersten unterstützten Fall Laravel/Vite soll ein Bereitschaftscheck entwickelt werden. Bei unbekannten Scripts muss die Oberfläche zwischen laufendem Prozess und bestätigter Erreichbarkeit unterscheiden.
+
+## Erste MVP-To-do-Liste
+
+### 1. Native Grundlage und manueller Start
+
+- [ ] Mindestversion von macOS und Verteilungsweg festlegen.
+- [ ] Swift-/SwiftUI-Projekt mit Menüleistenoberfläche und Einstellungsfenster anlegen.
+- [ ] Ein Projektverzeichnis manuell auswählen und lokal speichern können.
+- [ ] Einen konfigurierten Befehl starten und dessen Ausgabe begrenzt puffern und anzeigen.
+- [ ] Ausführbare Programme und die erforderliche Umgebung zuverlässig auflösen.
+- [ ] Stoppen, Neustarten und Beenden einschließlich Kindprozessen umsetzen.
+
+### 2. Automatik für ein Laravel-/Vite-Projekt
+
+- [ ] Relevante Dateiänderungen beobachten; initiale Erfassung ignorieren.
+- [ ] Ausschlüsse für Abhängigkeiten, Laufzeitdaten und Build-Ausgaben implementieren.
+- [ ] Ereignisse pro Projekt bündeln und parallele oder doppelte Starts verhindern.
+- [ ] Einmalige Projektfreigabe und manuelle Pause umsetzen.
+- [ ] Bereitschaft, Startfehler und unerwartetes Prozessende sichtbar machen.
+- [ ] Nach einem Fehler den Autostart bis zum manuellen Wiederholen oder Reaktivieren pausieren; keine unendlichen Wiederholungen.
+
+### 3. Mehrere Projekte und Erkennung
+
+- [ ] Ausgewählte Stammordner nach Projekten durchsuchen, ohne Abhängigkeitsordner zu durchlaufen.
+- [ ] `package.json`, `packageManager` und Lockfiles für Befehlsvorschläge auswerten.
+- [ ] Fehlende Scripts, widersprüchliche Lockfiles und fehlende Abhängigkeiten verständlich anzeigen; keine automatische Installation.
+- [ ] Mehrere Projekte und Git-Worktrees unabhängig verwalten.
+- [ ] Verschachtelte Projekte eindeutig zuordnen, damit nicht mehrere Server für dieselbe Änderung starten.
+- [ ] Bereits laufende Server und Portkonflikte behandeln.
+- [ ] Bekannte oder manuell hinterlegte Projekt-URLs öffnen können.
+- [ ] Geänderte Scriptdefinitionen erkennen und die Freigabe des Startbefehls erneut prüfen.
+
+### 4. Prüfung im eigenen Alltag
+
+- [ ] Dateiänderung durch einen KI-Agenten startet genau einen Server.
+- [ ] Viele schnelle Änderungen lösen keine doppelten Starts aus.
+- [ ] Änderungen in ausgeschlossenen Ordnern sowie die initiale Erfassung starten nichts.
+- [ ] PHP- und Blade-Änderungen lösen den Start korrekt aus.
+- [ ] Manueller Stopp bleibt trotz weiterer Änderungen wirksam.
+- [ ] Fehlendes Bun/Node, belegter Port und abstürzender Prozess liefern nachvollziehbare Fehler.
+- [ ] Bereits extern gestartete Server werden nicht versehentlich beendet.
+- [ ] Zwei gleichzeitig bearbeitete Projekte funktionieren unabhängig voneinander.
+- [ ] App-Beendigung hinterlässt keine von ihr gestarteten Entwicklungsserver.
+- [ ] Neustart der App, Ruhezustand und verschobene oder entfernte Projektordner prüfen.
+- [ ] CPU-Auslastung und Ereignisaufkommen mit realen Repositorys beobachten.
+
+Der erste vertikale Prototyp ist bewusst klein: ein ausgewähltes Laravel-/Vite-Projekt, ein bestätigter Befehl, eine relevante Dateiänderung und ein sichtbarer, sauber stoppbarer Prozess. Danach folgen Erkennung und mehrere Projekte.
+
+## Spätere Möglichkeiten
+
+- Weitere Prozesse pro Projekt, etwa Queue-Worker oder Laravel Reverb.
+- Projektprofile und konfigurierbare Ausschlüsse.
+- Optionaler Start beim Anmelden am Mac.
+- Optionale Regeln zum automatischen Stoppen mit bewusst gewählten Nutzungssignalen.
+- Unterstützung weiterer Webentwicklungs-Stacks.
+
+## Produktperspektive
+
+Das mögliche Produktversprechen lautet: „Du arbeitest am Projekt. Deine Entwicklungsprozesse starten automatisch.“
+
+Zunächst ist eine lokal arbeitende, kostenpflichtige Mac-App plausibler als ein SaaS mit Cloudbetrieb. Kaufmodell, bezahlte Updates oder ein Abonnement sind offene Geschäftsentscheidungen. Zahlungsbereitschaft und Abgrenzung zu bestehenden Werkzeugen müssen erst mit Nutzern geprüft werden. Der MVP soll zunächst den eigenen Entwicklungsalltag zuverlässig verbessern.
+
+## Status
+
+Konzeptphase. Dieses Repository enthält zunächst die Projektbeschreibung und die MVP-Planung. Ein Swift-/Xcode-Projekt wurde noch nicht angelegt.
