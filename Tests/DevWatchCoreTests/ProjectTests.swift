@@ -67,6 +67,24 @@ final class ProjectTests: XCTestCase {
         XCTAssertEqual(try ProjectDiscovery.inspect(directory: directory).executable, "npm")
     }
 
+    func testAllFourManagersAreRecognizedFromLockfiles() throws {
+        try write("package.json", #"{"scripts":{"dev":"vite"}}"#)
+        for (manager, lockfile) in [("bun", "bun.lock"), ("npm", "package-lock.json"), ("yarn", "yarn.lock"), ("pnpm", "pnpm-lock.yaml")] {
+            try write(lockfile)
+            XCTAssertEqual(try ProjectDiscovery.inspect(directory: directory).executable, manager)
+            try FileManager.default.removeItem(at: directory.appendingPathComponent(lockfile))
+        }
+    }
+
+    func testAllFourManagersAreRecognizedFromPackageManagerDeclaration() throws {
+        for manager in ["bun", "npm", "yarn", "pnpm"] {
+            let manifest = ["scripts": ["dev": "vite"], "packageManager": "\(manager)@1.2.3"] as [String: Any]
+            let data = try JSONSerialization.data(withJSONObject: manifest)
+            try data.write(to: directory.appendingPathComponent("package.json"))
+            XCTAssertEqual(try ProjectDiscovery.inspect(directory: directory).executable, manager)
+        }
+    }
+
     func testStorageRoundTripAndReplacement() throws {
         let storage = ProjectStorage(fileURL: directory.appendingPathComponent("settings/projects.json"))
         XCTAssertEqual(try storage.load(), [])

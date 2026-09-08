@@ -5,6 +5,10 @@ public struct DevProject: Identifiable, Codable, Equatable {
     public var directoryPath: String
     public var executable: String
     public var arguments: [String]
+    public var autostartApproval: AutostartApproval?
+    public var autostartPaused: Bool?
+
+    public var autostartEnabled: Bool { autostartApproval != nil && autostartPaused != true }
 
     public var name: String {
         URL(fileURLWithPath: directoryPath).lastPathComponent

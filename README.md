@@ -78,12 +78,12 @@ Ein gestarteter Prozess gilt nicht allein deshalb als erreichbarer Server. Für 
 
 ### 2. Automatik für ein Laravel-/Vite-Projekt
 
-- [ ] Relevante Dateiänderungen beobachten; initiale Erfassung ignorieren.
-- [ ] Ausschlüsse für Abhängigkeiten, Laufzeitdaten und Build-Ausgaben implementieren.
-- [ ] Ereignisse pro Projekt bündeln und parallele oder doppelte Starts verhindern.
-- [ ] Einmalige Projektfreigabe und manuelle Pause umsetzen.
+- [x] Relevante Dateiänderungen beobachten; initiale Erfassung ignorieren.
+- [x] Ausschlüsse für Abhängigkeiten, Laufzeitdaten und Build-Ausgaben implementieren.
+- [x] Ereignisse pro Projekt bündeln und parallele oder doppelte Starts verhindern.
+- [x] Einmalige Projektfreigabe und manuelle Pause umsetzen.
 - [ ] Bereitschaft, Startfehler und unerwartetes Prozessende sichtbar machen.
-- [ ] Nach einem Fehler den Autostart bis zum manuellen Wiederholen oder Reaktivieren pausieren; keine unendlichen Wiederholungen.
+- [x] Nach einem Fehler den Autostart bis zum manuellen Wiederholen oder Reaktivieren pausieren; keine unendlichen Wiederholungen.
 
 ### 3. Mehrere Projekte und Erkennung
 
@@ -91,10 +91,10 @@ Ein gestarteter Prozess gilt nicht allein deshalb als erreichbarer Server. Für 
 - [ ] `package.json`, `packageManager` und Lockfiles für Befehlsvorschläge auswerten.
 - [ ] Fehlende Scripts, widersprüchliche Lockfiles und fehlende Abhängigkeiten verständlich anzeigen; keine automatische Installation.
 - [ ] Mehrere Projekte und Git-Worktrees unabhängig verwalten.
-- [ ] Verschachtelte Projekte eindeutig zuordnen, damit nicht mehrere Server für dieselbe Änderung starten.
+- [x] Verschachtelte Projekte eindeutig zuordnen, damit nicht mehrere Server für dieselbe Änderung starten.
 - [ ] Bereits laufende Server und Portkonflikte behandeln.
 - [ ] Bekannte oder manuell hinterlegte Projekt-URLs öffnen können.
-- [ ] Geänderte Scriptdefinitionen erkennen und die Freigabe des Startbefehls erneut prüfen.
+- [x] Geänderte Scriptdefinitionen erkennen und die Freigabe des Startbefehls erneut prüfen.
 
 ### 4. Prüfung im eigenen Alltag
 
@@ -128,7 +128,7 @@ Zunächst ist eine lokal arbeitende, kostenpflichtige Mac-App plausibler als ein
 
 ## Aktueller Entwicklungsstand
 
-Die erste native Grundlage ist implementiert: SwiftUI-Menüleiste und Projektfenster, manuelle Projektauswahl, lokale Speicherung, Paketmanager-Erkennung, editierbarer Programmpfad, Start/Stop und begrenzte Prozesslogs. Es gibt noch keine Dateibeobachtung und keinen Autostart. Die obige MVP-Liste beschreibt weiterhin das vollständige Zielbild.
+Implementiert sind SwiftUI-Menüleiste und Projektfenster, Projektauswahl und lokale Speicherung, automatische Erkennung von Bun, Yarn, npm und pnpm, editierbarer Programmpfad, Start/Stop und Live-Logs. Ein FSEvents-Dateiwächter startet freigegebene Projekte bei relevanten Änderungen. Die verbleibenden Punkte der MVP-Liste beschreiben die nächsten Ausbauschritte.
 
 Voraussetzung: macOS 14 oder neuer und zum Bauen eine Swift-6-Toolchain, beispielsweise über Xcode. Das Projekt nutzt Swift Package Manager ohne externe Abhängigkeiten und ist über `Package.swift` in Xcode zu öffnen. Die Quellen werden zunächst im Swift-5-Sprachmodus kompiliert.
 
@@ -153,17 +153,21 @@ Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs 
 1. Einen einzelnen Projektordner mit `package.json` und `dev`-Script hinzufügen.
 2. Den vorgeschlagenen Paketmanager und das `dev`-Script des Projekts prüfen.
 3. Falls erforderlich den Programmnamen durch einen absoluten Pfad ersetzen und speichern.
-4. Mit „Starten“ den Prozess bewusst ausführen; Ausgabe und Fehler erscheinen im Projektfenster.
-5. Mit „Stoppen“ beenden. Das Schließen des Fensters lässt die App in der Menüleiste weiterlaufen; „DevWatch beenden“ stoppt ihre Prozesse.
+4. Mit „Autostart freigeben …“ Befehl und Script-Vorschau prüfen und bestätigen. Die Freigabe allein startet nichts; erst eine folgende relevante Dateiänderung startet den Prozess. Alternativ bleibt „Starten“ verfügbar.
+5. Mit „Stoppen“ beenden und den Autostart pausieren. Eine Pause bleibt über App-Neustarts erhalten. „Autostart pausieren“ lässt einen bereits laufenden Prozess weiterlaufen.
+6. Zum Fortsetzen erneut freigeben. Das Schließen des Fensters lässt die App in der Menüleiste weiterlaufen; „DevWatch beenden“ beendet Beobachtung und Prozesse, ohne eine zuvor aktive Freigabe zu pausieren.
 
 Die Projektliste liegt unter `~/Library/Application Support/DevWatch/projects.json`. Logs bleiben im Arbeitsspeicher. Das Entfernen eines Projekts aus der Liste löscht keine Projektdateien.
 
-Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 13 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
+Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 32 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Zusätzlich wurden die Autostart-Freigabe mit Script-Vorschau, der automatische Start nach PHP-Dateiänderung und die wirksame Pause nach manuellem Stoppen in der App geprüft. Die Tests decken alle vier Paketmanager, Freigabeänderungen, FSEvents und verschachtelte Projekte ab. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
 
 ### Bekannte Grenzen dieses ersten Schritts
 
 - Der Entwicklungsbefehl verwendet derzeit die Argumente `run dev`; der Programmname beziehungsweise Programmpfad ist editierbar.
-- Automatische Repository-Suche, Dateibeobachtung, Projektfreigaben für Autostart und Pause folgen als nächster MVP-Schritt.
+- Automatische Suche unter einem Repository-Stammordner steht noch aus. Projekte werden einzeln hinzugefügt. Registrierte verschachtelte Projekte werden dem jeweils tieferen Projekt zugeordnet.
+- Die Erkennung bevorzugt `packageManager`; ohne diese Angabe werden `bun.lock`/`bun.lockb`, `yarn.lock`, `package-lock.json`/`npm-shrinkwrap.json` und `pnpm-lock.yaml` geprüft. Mehrere unterschiedliche Manager führen zu einem Hinweis. Ohne Angaben wird npm vorgeschlagen. Die Installation von Abhängigkeiten erfolgt nicht automatisch.
+- Jede Änderung an `package.json` erfordert eine neue Freigabe, auch eine reine Formatierungsänderung. Die Prüfung erfolgt vor jedem automatischen Start und beim erneuten Beobachten nach einem App-Neustart. Veränderte Quellcodedateien benötigen keine neue Freigabe.
+- Symlink-Ziele außerhalb des Projektordners werden nicht beobachtet. Verschobene/entfernte Projektwurzeln oder verlorene Dateiereignisse pausieren die Beobachtung; anschließend muss das Projekt geprüft und erneut freigegeben werden.
 - Es gibt noch keinen automatischen Neustart, keine URL-Erkennung und keinen Bereitschaftscheck. „Prozess läuft“ bestätigt nicht die Erreichbarkeit der Website.
 - `PATH` wird um übliche Bun-, Homebrew- und Herd-Pfade ergänzt. Projektspezifische Node-Versionen, `.nvmrc` und asdf werden noch nicht ausgewertet; der Herd-NVM-Fallback greift nur bei einer installierten Version.
 - Bereits extern gestartete Server werden weder erkannt noch übernommen. Portkonflikte erscheinen über die Ausgabe des gestarteten Werkzeugs.

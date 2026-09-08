@@ -25,8 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let model, model.runningCount > 0 else { return .terminateNow }
-        model.stopAll()
+        guard let model else { return .terminateNow }
+        model.shutdown()
+        guard model.runningCount > 0 else { return .terminateNow }
         // Keep the run loop alive until the process manager's bounded shutdown completes.
         Task { @MainActor in
             while model.runningCount > 0 {

@@ -25,7 +25,7 @@ struct ProjectsView: View {
             }
         } detail: {
             if let project = model.projects.first(where: { $0.id == model.selectedID }) {
-                ProjectDetail(project: project, process: model.process(for: project), model: model)
+                ProjectDetail(project: project, automation: model.automation(for: project), process: model.automation(for: project).process, model: model)
                     .id(project.id)
             } else {
                 ContentUnavailableView {
@@ -50,10 +50,17 @@ struct ProjectsView: View {
 
 private struct ProjectDetail: View {
     let project: DevProject
+    @ObservedObject var automation: ProjectAutomation
     @ObservedObject var process: DevelopmentProcess
     @ObservedObject var model: AppModel
     @State private var executable = ""
     @State private var showRemoveConfirmation = false
+    private struct ApprovalRequest: Identifiable {
+        let id = UUID()
+        let approval: AutostartApproval
+        let script: String
+    }
+    @State private var approvalRequest: ApprovalRequest?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -76,7 +83,7 @@ private struct ProjectDetail: View {
                     HStack {
                         Text("Entwicklungsbefehl").font(.headline)
                         Spacer()
-                        Text("Manueller Start").font(.caption).foregroundStyle(.secondary)
+                        Text(project.autostartEnabled ? "Autostart aktiv" : "Manueller Start").font(.caption).foregroundStyle(.secondary)
                     }
                     HStack {
                         TextField("Programm oder absoluter Pfad", text: $executable)
@@ -88,21 +95,35 @@ private struct ProjectDetail: View {
                         Button("Speichern", action: saveExecutable)
                             .disabled(process.isRunning || executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || executable == project.executable)
                     }
-                    Text("Prüfe das dev-Script deiner package.json vor dem Start. Dateibeobachtung und Autostart folgen im nächsten Schritt.")
+                    Text(automation.status)
                         .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button {
-                            process.start(directory: URL(fileURLWithPath: project.directoryPath),
-                                          executable: project.executable, arguments: project.arguments)
+                            automation.startManually()
                         } label: { Label("Starten", systemImage: "play.fill") }
                             .buttonStyle(.borderedProminent)
                             .disabled(process.isRunning || executable != project.executable)
-                        Button { process.stop() } label: { Label("Stoppen", systemImage: "stop.fill") }
+                        Button { automation.stopManually() } label: { Label("Stoppen", systemImage: "stop.fill") }
                             .disabled(!process.isRunning)
                         Spacer()
                         Button("Im Finder") {
                             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: project.directoryPath)
                         }
+                    }
+                    Divider()
+                    HStack {
+                        if project.autostartEnabled {
+                            Button("Autostart pausieren") { automation.pause() }
+                        } else {
+                            Button("Autostart freigeben …", action: prepareApproval)
+                                .disabled(executable != project.executable)
+                        }
+                        Spacer()
+                        Text("Auslöser: Dateiänderung").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let change = automation.lastChange {
+                        Text("Letzte Änderung: \(change)")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }.padding(8)
             }
@@ -137,10 +158,42 @@ private struct ProjectDetail: View {
         }
         .padding(24)
         .onAppear { executable = project.executable }
+        .sheet(item: $approvalRequest) { request in
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Autostart freigeben").font(.title2.bold())
+                Text("Bei relevanten Dateiänderungen führt DevWatch diesen Befehl in \(project.name) aus. Die Freigabe startet noch keinen Prozess.")
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(([project.executable] + project.arguments).joined(separator: " "))
+                    .font(.system(.body, design: .monospaced)).textSelection(.enabled)
+                ScrollView {
+                    Text(request.script).font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }.frame(height: 120)
+                Text("Änderungen an package.json oder am Befehl erfordern eine neue Freigabe. Stoppen pausiert den Autostart.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button("Abbrechen") { approvalRequest = nil }
+                    Button("Freigeben") {
+                        automation.enable(approval: request.approval)
+                        approvalRequest = nil
+                    }.buttonStyle(.borderedProminent)
+                }
+            }.padding(24).frame(width: 490)
+        }
         .confirmationDialog("Projekt aus DevWatch entfernen? Die Dateien bleiben erhalten.",
                             isPresented: $showRemoveConfirmation) {
             Button("Entfernen", role: .destructive) { model.remove(project) }
         }
+    }
+
+    private func prepareApproval() {
+        do {
+            let approval = try AutostartApproval.capture(project: project)
+            let script = try AutostartApproval.scriptDescription(project: project)
+            approvalRequest = ApprovalRequest(approval: approval, script: script)
+        } catch { model.errorMessage = error.localizedDescription }
     }
 
     private func saveExecutable() {

@@ -7,7 +7,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var projects: [DevProject] = []
     @Published var selectedID: UUID?
     @Published var errorMessage: String?
-    private var processes: [UUID: DevelopmentProcess] = [:]
+    private var automations: [UUID: ProjectAutomation] = [:]
     private var subscriptions: [UUID: AnyCancellable] = [:]
     private let storage: ProjectStorage
     private var storageAvailable = true
@@ -19,22 +19,42 @@ final class AppModel: ObservableObject {
         do {
             projects = try storage.load()
             selectedID = projects.first?.id
+            let restored = projects
+            for project in restored { _ = automation(for: project) }
+            refreshOwnership()
+            automations.values.forEach { $0.beginObserving() }
         } catch {
             storageAvailable = false
             errorMessage = "Projektliste konnte nicht geladen werden: \(error.localizedDescription)"
         }
     }
 
-    var runningCount: Int { processes.values.filter(\.isRunning).count }
+    var runningCount: Int { automations.values.filter { $0.process.isRunning }.count }
 
-    func process(for project: DevProject) -> DevelopmentProcess {
-        if let process = processes[project.id] { return process }
-        let process = DevelopmentProcess()
-        processes[project.id] = process
-        subscriptions[project.id] = process.objectWillChange.sink { [weak self] _ in
+    func automation(for project: DevProject) -> ProjectAutomation {
+        if let existing = automations[project.id] { return existing }
+        let automation = ProjectAutomation(project: project) { [weak self] updated in
+            guard let self else { return false }
+            var list = self.projects
+            guard let index = list.firstIndex(where: { $0.id == updated.id }) else { return false }
+            list[index] = updated
+            do { try self.persist(list); return true }
+            catch { self.errorMessage = error.localizedDescription; return false }
+        }
+        automations[project.id] = automation
+        subscriptions[project.id] = automation.process.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
-        return process
+        return automation
+    }
+
+    private func refreshOwnership() {
+        for automation in automations.values {
+            let prefix = automation.project.directoryPath + "/"
+            automation.excludedDirectories = projects.compactMap {
+                $0.directoryPath.hasPrefix(prefix) ? String($0.directoryPath.dropFirst(prefix.count)) : nil
+            }
+        }
     }
 
     func addProject() {
@@ -56,27 +76,40 @@ final class AppModel: ObservableObject {
             updated.append(candidate)
             try persist(updated)
             selectedID = candidate.id
+            _ = automation(for: candidate)
+            refreshOwnership()
         } catch { errorMessage = error.localizedDescription }
     }
 
     func update(_ project: DevProject) {
         var updated = projects
         guard let index = updated.firstIndex(where: { $0.id == project.id }) else { return }
-        updated[index] = project
-        do { try persist(updated) } catch { errorMessage = error.localizedDescription }
+        var changed = project
+        if changed.executable != projects[index].executable || changed.arguments != projects[index].arguments {
+            changed.autostartApproval = nil
+            changed.autostartPaused = true
+        }
+        updated[index] = changed
+        do {
+            try persist(updated)
+            automation(for: changed).configure(changed)
+        } catch { errorMessage = error.localizedDescription }
     }
 
     func remove(_ project: DevProject) {
-        guard !process(for: project).isRunning else { return }
+        guard !automation(for: project).process.isRunning else { return }
         do {
             try persist(projects.filter { $0.id != project.id })
-            processes.removeValue(forKey: project.id)
+            automations.removeValue(forKey: project.id)?.shutdown()
+            refreshOwnership()
             subscriptions.removeValue(forKey: project.id)
             selectedID = projects.first?.id
         } catch { errorMessage = error.localizedDescription }
     }
 
-    func stopAll() { processes.values.forEach { $0.stop() } }
+    func stopAll() { automations.values.forEach { $0.stopManually() } }
+
+    func shutdown() { automations.values.forEach { $0.shutdown() } }
 
     private func persist(_ updated: [DevProject]) throws {
         guard storageAvailable else {
