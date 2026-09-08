@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ScriptLabels: View {
     @ObservedObject var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let project: DevProject
 
     var body: some View {
@@ -14,6 +15,8 @@ struct ScriptLabels: View {
                     Button { model.toggleScript(for: project, name: name) } label: {
                         HStack(spacing: 4) {
                             Image(systemName: symbol(for: state)).font(.system(size: 8, weight: .bold))
+                                .symbolEffect(.pulse, options: .repeating,
+                                              isActive: state == .running && name != "dev" && !reduceMotion)
                             Text(name).font(.system(.caption, design: .monospaced).weight(.medium))
                         }
                         .foregroundStyle(color(for: state))
