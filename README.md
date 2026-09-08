@@ -69,10 +69,10 @@ Ein gestarteter Prozess gilt nicht allein deshalb als erreichbarer Server. Für 
 
 ### 1. Native Grundlage und manueller Start
 
-- [ ] Mindestversion von macOS und Verteilungsweg festlegen.
-- [ ] Swift-/SwiftUI-Projekt mit Menüleistenoberfläche und Einstellungsfenster anlegen.
-- [ ] Ein Projektverzeichnis manuell auswählen und lokal speichern können.
-- [ ] Einen konfigurierten Befehl starten und dessen Ausgabe begrenzt puffern und anzeigen.
+- [x] Mindestversion von macOS und lokalen Verteilungsweg festlegen (macOS 14+, App-Bundle).
+- [x] Swift-/SwiftUI-Projekt mit Menüleiste und Projektfenster einschließlich Befehlseinstellung anlegen.
+- [x] Ein Projektverzeichnis manuell auswählen und lokal speichern können.
+- [x] Einen konfigurierten Befehl starten und dessen Ausgabe begrenzt puffern und anzeigen.
 - [ ] Ausführbare Programme und die erforderliche Umgebung zuverlässig auflösen.
 - [ ] Stoppen, Neustarten und Beenden einschließlich Kindprozessen umsetzen.
 
@@ -126,6 +126,50 @@ Das mögliche Produktversprechen lautet: „Du arbeitest am Projekt. Deine Entwi
 
 Zunächst ist eine lokal arbeitende, kostenpflichtige Mac-App plausibler als ein SaaS mit Cloudbetrieb. Kaufmodell, bezahlte Updates oder ein Abonnement sind offene Geschäftsentscheidungen. Zahlungsbereitschaft und Abgrenzung zu bestehenden Werkzeugen müssen erst mit Nutzern geprüft werden. Der MVP soll zunächst den eigenen Entwicklungsalltag zuverlässig verbessern.
 
-## Status
+## Aktueller Entwicklungsstand
 
-Konzeptphase. Dieses Repository enthält zunächst die Projektbeschreibung und die MVP-Planung. Ein Swift-/Xcode-Projekt wurde noch nicht angelegt.
+Die erste native Grundlage ist implementiert: SwiftUI-Menüleiste und Projektfenster, manuelle Projektauswahl, lokale Speicherung, Paketmanager-Erkennung, editierbarer Programmpfad, Start/Stop und begrenzte Prozesslogs. Es gibt noch keine Dateibeobachtung und keinen Autostart. Die obige MVP-Liste beschreibt weiterhin das vollständige Zielbild.
+
+Voraussetzung: macOS 14 oder neuer und zum Bauen eine Swift-6-Toolchain, beispielsweise über Xcode. Das Projekt nutzt Swift Package Manager ohne externe Abhängigkeiten und ist über `Package.swift` in Xcode zu öffnen. Die Quellen werden zunächst im Swift-5-Sprachmodus kompiliert.
+
+### Entwickeln und testen
+
+```sh
+swift run DevWatch
+swift test
+```
+
+### Als Mac-App bauen
+
+```sh
+bash scripts/build-app.sh
+open build/DevWatch.app
+```
+
+Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs mit Ad-hoc-Signatur. Eine Developer-ID-Signierung, Notarisierung und Verteilung an andere Nutzer sind noch nicht eingerichtet. Der Prototyp läuft außerhalb der App Sandbox, damit er lokale Entwicklungswerkzeuge starten kann.
+
+### Erste Verwendung
+
+1. Einen einzelnen Projektordner mit `package.json` und `dev`-Script hinzufügen.
+2. Den vorgeschlagenen Paketmanager und das `dev`-Script des Projekts prüfen.
+3. Falls erforderlich den Programmnamen durch einen absoluten Pfad ersetzen und speichern.
+4. Mit „Starten“ den Prozess bewusst ausführen; Ausgabe und Fehler erscheinen im Projektfenster.
+5. Mit „Stoppen“ beenden. Das Schließen des Fensters lässt die App in der Menüleiste weiterlaufen; „DevWatch beenden“ stoppt ihre Prozesse.
+
+Die Projektliste liegt unter `~/Library/Application Support/DevWatch/projects.json`. Logs bleiben im Arbeitsspeicher. Das Entfernen eines Projekts aus der Liste löscht keine Projektdateien.
+
+Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 13 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
+
+### Bekannte Grenzen dieses ersten Schritts
+
+- Der Entwicklungsbefehl verwendet derzeit die Argumente `run dev`; der Programmname beziehungsweise Programmpfad ist editierbar.
+- Automatische Repository-Suche, Dateibeobachtung, Projektfreigaben für Autostart und Pause folgen als nächster MVP-Schritt.
+- Es gibt noch keinen automatischen Neustart, keine URL-Erkennung und keinen Bereitschaftscheck. „Prozess läuft“ bestätigt nicht die Erreichbarkeit der Website.
+- `PATH` wird um übliche Bun-, Homebrew- und Herd-Pfade ergänzt. Projektspezifische Node-Versionen, `.nvmrc` und asdf werden noch nicht ausgewertet; der Herd-NVM-Fallback greift nur bei einer installierten Version.
+- Bereits extern gestartete Server werden weder erkannt noch übernommen. Portkonflikte erscheinen über die Ausgabe des gestarteten Werkzeugs.
+- Eigene Prozessgruppen werden beim Stoppen und regulären App-Beenden aufgeräumt. Bewusst daemonisierte Prozesse, die ihre Prozessgruppe verlassen, und ein erzwungenes Beenden der App sind nicht abgedeckt.
+
+### Implementierungsquellen
+
+- [Apple: MenuBarExtra](https://developer.apple.com/documentation/swiftui/menubarextra) für die native Menüleiste.
+- [Apple: Swift Package Targets](https://developer.apple.com/documentation/PackageDescription/Target) für die Aufteilung in App, Kernmodul und Tests.
