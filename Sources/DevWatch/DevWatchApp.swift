@@ -13,10 +13,68 @@ struct DevWatchApp: App {
         }
         .defaultSize(width: 920, height: 620)
 
-        MenuBarExtra("DevWatch", systemImage: "terminal") {
+        MenuBarExtra {
             MenuContent(model: model)
                 .onAppear { delegate.model = model }
+        } label: {
+            MenuBarStatusLabel(model: model)
         }
+    }
+}
+
+private struct MenuBarStatusLabel: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var status: String {
+        if model.runningCount > 0 { return "\(model.runningCount) Entwicklungsprozesse laufen" }
+        if model.isScanning { return "Git-Projekte werden gesucht" }
+        return "Keine Entwicklungsprozesse aktiv"
+    }
+
+    var body: some View {
+        Image(nsImage: MenuBarIcon.make(running: model.runningCount > 0,
+                                       scanning: model.isScanning, dark: colorScheme == .dark))
+            .renderingMode(.original)
+            .accessibilityLabel("DevWatch: \(status)")
+            .help("DevWatch: \(status)")
+    }
+}
+
+/// A non-template image preserves the badge color in the macOS status bar.
+enum MenuBarIcon {
+    static func make(running: Bool, scanning: Bool, dark: Bool) -> NSImage {
+        let image = NSImage(size: NSSize(width: 22, height: 18), flipped: false) { _ in
+            let ink: NSColor = dark ? .white : .black
+            ink.setStroke()
+            let frame = NSBezierPath(roundedRect: NSRect(x: 1.5, y: 3.5, width: 17, height: 12),
+                                     xRadius: 2, yRadius: 2)
+            frame.lineWidth = 1.4
+            frame.stroke()
+            let prompt = NSBezierPath()
+            prompt.move(to: NSPoint(x: 5, y: 12))
+            prompt.line(to: NSPoint(x: 8, y: 9.5))
+            prompt.line(to: NSPoint(x: 5, y: 7))
+            prompt.move(to: NSPoint(x: 10, y: 7))
+            prompt.line(to: NSPoint(x: 14, y: 7))
+            prompt.lineWidth = 1.4
+            prompt.lineCapStyle = .round
+            prompt.lineJoinStyle = .round
+            prompt.stroke()
+            if running || scanning {
+                // Running takes priority so periodic discovery never hides the green badge.
+                let badge = NSBezierPath(ovalIn: NSRect(x: 14.5, y: 0.5, width: 7, height: 7))
+                (running ? NSColor.systemGreen : NSColor.systemOrange).setFill()
+                badge.fill()
+                (dark ? NSColor.black : NSColor.white).setStroke()
+                badge.lineWidth = 0.8
+                badge.stroke()
+            }
+            return true
+        }
+        image.isTemplate = !running && !scanning
+        image.accessibilityDescription = "DevWatch"
+        return image
     }
 }
 
@@ -47,6 +105,7 @@ private struct MenuContent: View {
 
     var body: some View {
         Text("\(model.runningCount) Prozesse laufen")
+        if model.isScanning { Text("Git-Projekte werden gesucht …") }
         Divider()
         Button("Projekte öffnen …") {
             openWindow(id: "projects")

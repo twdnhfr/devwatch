@@ -159,6 +159,8 @@ Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs 
 
 Die Projektliste liegt unter `~/Library/Application Support/DevWatch/projects.json`; Stammordner und ausgeblendete Pfade werden daneben in `roots.json` gespeichert. Logs bleiben im Arbeitsspeicher. Das Entfernen eines Projekts aus der Liste löscht keine Projektdateien.
 
+Das Menüleisten-Icon zeigt unten rechts einen grünen Punkt, wenn mindestens ein Entwicklungsprozess läuft, oder einen orangefarbenen Punkt während der Projektsuche. Laufende Prozesse haben Vorrang vor der Suchanzeige. Ohne laufenden Prozess und ohne Suche bleibt das Icon neutral. Grün bestätigt den Prozessstatus, nicht die Erreichbarkeit des Entwicklungsservers.
+
 Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 41 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Zusätzlich wurden die Autostart-Freigabe mit Script-Vorschau, der automatische Start nach PHP-Dateiänderung und die wirksame Pause nach manuellem Stoppen in der App geprüft. Die Tests decken alle vier Paketmanager, Freigabeänderungen, FSEvents, rekursive Repository-Suche, Worktree-Marker, überlappende Suchordner, fehlende Frontend-Konfiguration und Stammordner-Persistenz ab. Die Stammordnerauswahl und die Anzeige realer Repositories wurden zusätzlich in der App geprüft. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
 
 ### Bekannte Grenzen dieses ersten Schritts
