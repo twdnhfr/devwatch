@@ -8,6 +8,12 @@ public final class ProjectAutomation: ObservableObject {
     @Published public private(set) var project: DevProject
     @Published public private(set) var status = "Autostart nicht freigegeben"
     @Published public private(set) var lastChange: String?
+    @Published public private(set) var idleDeadline: Date?
+    private let inactivityTimeout: TimeInterval
+    private var idleTask: Task<Void, Never>?
+    private var timerGeneration = UUID()
+    private var idleStopInProgress = false
+    private var activityWhileStopping = false
     private var watcher: ProjectWatcher?
     private var subscription: AnyCancellable?
     private var shuttingDown = false
@@ -17,16 +23,18 @@ public final class ProjectAutomation: ObservableObject {
     public var excludedDirectories: [String] = []
 
     public init(project: DevProject,
+                inactivityTimeout: TimeInterval = 30 * 60,
                 onApprovalNeeded: ((DevProject, [String]) -> Void)? = nil,
                 persist: @escaping (DevProject) -> Bool) {
         self.project = project
+        self.inactivityTimeout = inactivityTimeout.isFinite && inactivityTimeout > 0 ? inactivityTimeout : 30 * 60
         self.onApprovalNeeded = onApprovalNeeded
         self.persist = persist
         subscription = process.$isRunning.dropFirst().sink { [weak self] running in
             // Published values arrive before the property's mutation has completed.
             Task { @MainActor [weak self] in
-                guard let self, !running, !self.process.isRunning, !self.shuttingDown, self.project.autostartEnabled else { return }
-                self.pause(reason: "Prozess beendet – Autostart pausiert")
+                guard let self, !running, !self.process.isRunning else { return }
+                self.processEnded()
             }
         }
     }
@@ -34,11 +42,11 @@ public final class ProjectAutomation: ObservableObject {
     public func beginObserving() {
         watcher?.stop()
         watcher = nil
-        guard project.autostartPaused != true, !shuttingDown else {
+        guard !shuttingDown, project.autostartPaused != true || process.isRunning else {
             status = "Autostart pausiert"
             return
         }
-        if let approval = project.autostartApproval, !approval.matches(project: project) {
+        if project.autostartEnabled, let approval = project.autostartApproval, !approval.matches(project: project) {
             invalidateApproval()
             return
         }
@@ -83,12 +91,15 @@ public final class ProjectAutomation: ObservableObject {
     }
 
     public func pause(reason: String = "Autostart pausiert") {
-        watcher?.stop()
-        watcher = nil
+        if !process.isRunning {
+            watcher?.stop()
+            watcher = nil
+        }
         var updated = project
         updated.autostartPaused = true
         project = updated // Fail closed even when persistence fails.
         _ = persist(updated)
+        // Keep an existing observer for a running server's idle timer, but never rearm on observer errors.
         status = reason
     }
 
@@ -98,24 +109,42 @@ public final class ProjectAutomation: ObservableObject {
     }
 
     public func stopManually() {
+        cancelIdleTimer()
+        idleStopInProgress = false
+        activityWhileStopping = false
         pause()
+        watcher?.stop()
+        watcher = nil
         process.stop()
     }
 
     public func shutdown() {
         shuttingDown = true
+        cancelIdleTimer()
+        idleStopInProgress = false
+        activityWhileStopping = false
         watcher?.stop()
         watcher = nil
         process.stop()
     }
 
     private func filesChanged(_ paths: [String]) {
-        guard !shuttingDown, project.autostartPaused != true else { return }
+        guard !shuttingDown else { return }
         let relevant = paths.filter { path in
             !excludedDirectories.contains { path == $0 || path.hasPrefix($0 + "/") }
         }
         guard !relevant.isEmpty else { return }
         lastChange = relevant.sorted().prefix(3).joined(separator: ", ")
+        // Remember edits even after the process exited but before processEnded runs.
+        if idleStopInProgress || process.isRunning {
+            if idleStopInProgress { activityWhileStopping = true }
+            else { resetIdleTimer() }
+            if project.autostartEnabled, project.autostartApproval?.matches(project: project) != true {
+                invalidateApproval()
+            }
+            return
+        }
+        guard project.autostartPaused != true else { return }
         if project.autostartApproval == nil {
             guard !process.isRunning, !hasRequestedApproval else { return }
             hasRequestedApproval = true
@@ -131,17 +160,78 @@ public final class ProjectAutomation: ObservableObject {
     }
 
     private func launch() {
-        guard !process.isRunning else { return }
+        guard !process.isRunning, !idleStopInProgress, !shuttingDown else { return }
         process.start(directory: URL(fileURLWithPath: project.directoryPath),
                       executable: project.executable, arguments: project.arguments)
         if !process.isRunning {
+            cancelIdleTimer()
             pause(reason: "Start fehlgeschlagen – Autostart pausiert")
+        } else {
+            resetIdleTimer()
+            if watcher == nil { beginObserving() }
+        }
+    }
+
+    private func resetIdleTimer() {
+        cancelIdleTimer()
+        guard process.isRunning, !shuttingDown, !idleStopInProgress else { return }
+        let generation = UUID()
+        timerGeneration = generation
+        let interval = inactivityTimeout
+        idleDeadline = Date().addingTimeInterval(interval)
+        // ContinuousClock includes time spent asleep; an expired deadline is handled on wake.
+        idleTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(interval), clock: .continuous) }
+            catch { return }
+            guard let self, !Task.isCancelled, self.timerGeneration == generation,
+                  !self.shuttingDown, self.process.isRunning else { return }
+            self.idleTask = nil
+            self.idleDeadline = nil
+            self.idleStopInProgress = true
+            self.activityWhileStopping = false
+            self.status = "Inaktivität – Prozess wird beendet"
+            self.process.stop()
+        }
+    }
+
+    private func cancelIdleTimer() {
+        timerGeneration = UUID()
+        idleTask?.cancel()
+        idleTask = nil
+        idleDeadline = nil
+    }
+
+    private func processEnded() {
+        cancelIdleTimer()
+        guard !shuttingDown else { return }
+        if idleStopInProgress {
+            let restart = activityWhileStopping && project.autostartEnabled &&
+                project.autostartApproval?.matches(project: project) == true
+            idleStopInProgress = false
+            activityWhileStopping = false
+            if project.autostartPaused == true {
+                watcher?.stop()
+                watcher = nil
+            } else if watcher == nil {
+                beginObserving()
+            }
+            if restart { launch() }
+            else { status = "Nach Inaktivität gestoppt" }
+        } else if project.autostartEnabled {
+            pause(reason: "Prozess beendet – Autostart pausiert")
+        } else if project.autostartPaused == true {
+            watcher?.stop()
+            watcher = nil
+        } else if watcher == nil {
+            beginObserving()
         }
     }
 
     private func invalidateApproval() {
-        watcher?.stop()
-        watcher = nil
+        if !process.isRunning {
+            watcher?.stop()
+            watcher = nil
+        }
         var updated = project
         updated.autostartApproval = nil
         updated.autostartPaused = true

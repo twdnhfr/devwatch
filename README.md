@@ -23,6 +23,7 @@ Die App ergänzt Herd. Sie verwaltet in V1 weder PHP noch Datenbanken und benöt
 - Ein bereits laufender Entwicklungsserver wird durch weitere Dateiänderungen nicht erneut gestartet. Das Nachladen übernimmt der Entwicklungsserver.
 - Mehrere Projekte können gleichzeitig laufen.
 - Menüaktionen: Start, Stop, Neustart, Logs anzeigen und Website öffnen, sofern eine URL bekannt ist.
+- Nach 30 Minuten ohne relevante Dateiänderung wird ein laufender Entwicklungsprozess automatisch beendet. Jede erfasste Änderung setzt die Frist zurück; bei aktivem Autostart startet die nächste Änderung den Prozess wieder.
 - Ein manueller Stopp pausiert den Autostart dieses Projekts bis zur ausdrücklichen Reaktivierung.
 - Beim Beenden der App werden die von ihr gestarteten Prozesse einschließlich ihrer Kindprozesse sauber beendet.
 
@@ -45,7 +46,7 @@ Das erstmalige Erfassen eines Ordners zählt nicht als Dateiänderung. Ausgaben 
 
 Ein `git pull` oder Branchwechsel kann relevante Dateien verändern und damit den Server starten. Das ist für aktivierte Projekte in V1 eine akzeptierte Grenze. Reines Lesen eines Projekts löst keinen Start aus; dafür bleibt der manuelle Start verfügbar.
 
-Nicht vorgesehen sind eine Shell-Integration, das Erkennen eines Verzeichniswechsels im Terminal oder das Auslesen von Agentensitzungen. Automatisches Stoppen bei vermeintlicher Inaktivität gehört ebenfalls nicht zu V1, weil fehlende Dateiänderungen keine zuverlässige Aussage über die Nutzung im Browser erlauben.
+Nicht vorgesehen sind eine Shell-Integration, das Erkennen eines Verzeichniswechsels im Terminal oder das Auslesen von Agentensitzungen. Der Inaktivitätstimer verwendet ausschließlich relevante Dateiänderungen: Reines Lesen im Terminal und die Nutzung im Browser verlängern die 30 Minuten nicht.
 
 ## Technischer Entwurf
 
@@ -117,7 +118,7 @@ Der erste vertikale Prototyp ist bewusst klein: ein ausgewähltes Laravel-/Vite-
 - Weitere Prozesse pro Projekt, etwa Queue-Worker oder Laravel Reverb.
 - Projektprofile und konfigurierbare Ausschlüsse.
 - Optionaler Start beim Anmelden am Mac.
-- Optionale Regeln zum automatischen Stoppen mit bewusst gewählten Nutzungssignalen.
+- Konfigurierbare Dauer für den automatischen Stopp und zusätzliche Nutzungssignale.
 - Unterstützung weiterer Webentwicklungs-Stacks.
 
 ## Produktperspektive
@@ -164,7 +165,7 @@ Der Aktivitätshinweis wird pro Projekt höchstens einmal pro App-Sitzung automa
 
 Das Menüleisten-Icon zeigt unten rechts einen grünen Punkt, wenn mindestens ein Entwicklungsprozess läuft, oder einen orangefarbenen Punkt während der Projektsuche. Laufende Prozesse haben Vorrang vor der Suchanzeige. Ohne laufenden Prozess und ohne Suche bleibt das Icon neutral. Grün bestätigt den Prozessstatus, nicht die Erreichbarkeit des Entwicklungsservers.
 
-Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 45 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Zusätzlich wurden die Autostart-Freigabe mit Script-Vorschau, der automatische Start nach PHP-Dateiänderung und die wirksame Pause nach manuellem Stoppen in der App geprüft. Die Tests decken alle vier Paketmanager, Freigabeänderungen, FSEvents, rekursive Repository-Suche, Worktree-Marker, überlappende Suchordner, fehlende Frontend-Konfiguration und Stammordner-Persistenz ab. Die Stammordnerauswahl und die Anzeige realer Repositories wurden zusätzlich in der App geprüft. Der Aktivitätshinweis am Menüleisten-Icon und der anschließende Start wurden mit einem isolierten Bun-Testprojekt geprüft. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
+Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 50 Tests bestanden. In der gebauten App wurden Projektauswahl, Speicherung über einen App-Neustart, manueller Start, Live-Ausgabe, Stoppen, Beenden mit laufendem Prozess und Entfernen des Testeintrags geprüft. Zusätzlich wurden die Autostart-Freigabe mit Script-Vorschau, der automatische Start nach PHP-Dateiänderung und die wirksame Pause nach manuellem Stoppen in der App geprüft. Die Tests decken alle vier Paketmanager, Freigabeänderungen, FSEvents, rekursive Repository-Suche, Worktree-Marker, überlappende Suchordner, fehlende Frontend-Konfiguration Stammordner-Persistenz sowie Ablauf und Zurücksetzen des Inaktivitätstimers ab. Die Stammordnerauswahl und die Anzeige realer Repositories wurden zusätzlich in der App geprüft. Der Aktivitätshinweis am Menüleisten-Icon und der anschließende Start wurden mit einem isolierten Bun-Testprojekt geprüft. Hierfür wurde ein isoliertes Bun-Testprojekt verwendet; die Integration mit einem realen Laravel-/Vite-Projekt steht noch aus.
 
 ### Bekannte Grenzen dieses ersten Schritts
 
@@ -187,3 +188,5 @@ Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 45 Tests be
 - [Apple: Swift Package Targets](https://developer.apple.com/documentation/PackageDescription/Target) für die Aufteilung in App, Kernmodul und Tests.
 
 Die Oberfläche ist bewusst reduziert: Projektname, Status, Autostart-Schalter und ein gemeinsamer Start-/Stopp-Knopf. Logs, Pfade und Befehlseinstellungen sind standardmäßig eingeklappt. Das Menüleisten-Popup zeigt direkt nur Projekt, Befehl und Freigabeaktion; technische Angaben stehen unter „Details“. Hauptansicht, Detailbereich und Ordnerverwaltung wurden nach dem Umbau im Release-Build visuell geprüft.
+
+Der Inaktivitätstimer beginnt bei jedem erfolgreichen Prozessstart und läuft 30 Minuten ab der letzten erfassten relevanten Dateiänderung. Ausgeschlossene Logs, Build-Dateien und Änderungen in registrierten Unterprojekten verlängern ihn nicht. Die geplante Stoppzeit steht unter „Details & Logs“. Ein automatischer Stopp erhält die bestehende Freigabe; manuelles Stoppen bleibt eine bewusste Pause. Auch manuell gestartete Prozesse haben den Timer. Der Timer zählt Ruhezustand mit und wird beim regulären App-Beenden verworfen. Die Timer-Integration wurde mit verkürzten Fristen an isolierten Prozessen geprüft.

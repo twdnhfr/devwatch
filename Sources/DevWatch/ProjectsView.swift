@@ -192,6 +192,10 @@ private struct ProjectDetail: View {
                                 .disabled(process.isRunning || executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || executable == project.executable)
                         }
                         Text(automation.status).font(.caption).foregroundStyle(.secondary)
+                        if let deadline = automation.idleDeadline {
+                            Text("Automatischer Stopp um \(deadline.formatted(date: .omitted, time: .shortened)) – nach 30 Minuten ohne Dateiänderung.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         if let change = automation.lastChange {
                             Text("Letzte Änderung: \(change)").font(.caption).textSelection(.enabled)
                         }
