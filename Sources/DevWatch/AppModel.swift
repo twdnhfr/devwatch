@@ -47,6 +47,11 @@ final class AppModel: ObservableObject {
         catch { rootsAvailable = false; errorMessage = "Stammordner konnten nicht geladen werden: \(error.localizedDescription)" }
         do {
             projects = try storage.load()
+            let defaults = projects.map { $0.applyingDefaultAutostart() }
+            if defaults != projects {
+                try storage.save(defaults)
+                projects = defaults
+            }
             selectedPath = projects.first?.directoryPath
             let restored = projects
             for project in restored { _ = automation(for: project) }
@@ -135,7 +140,7 @@ final class AppModel: ObservableObject {
             for repository in result.repositories where !self.rootSettings.hiddenRepositoryPaths.contains(repository.directoryPath) {
                 if let candidate = repository.project,
                    !updated.contains(where: { $0.directoryPath == candidate.directoryPath }) {
-                    updated.append(candidate)
+                    updated.append(candidate.applyingDefaultAutostart())
                 }
                 if repository.project == nil,
                    let existing = self.automations.values.first(where: { $0.project.directoryPath == repository.directoryPath }),
@@ -283,7 +288,7 @@ final class AppModel: ObservableObject {
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let directory = panel.url else { return }
         do {
-            let candidate = try ProjectDiscovery.inspect(directory: directory.resolvingSymlinksInPath())
+            let candidate = try ProjectDiscovery.inspect(directory: directory.resolvingSymlinksInPath()).applyingDefaultAutostart()
             if rootSettings.hiddenRepositoryPaths.contains(candidate.directoryPath) {
                 var settings = rootSettings
                 settings.hiddenRepositoryPaths.removeAll { $0 == candidate.directoryPath }

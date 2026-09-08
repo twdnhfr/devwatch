@@ -10,6 +10,16 @@ public struct DevProject: Identifiable, Codable, Equatable, Sendable {
 
     public var autostartEnabled: Bool { autostartApproval != nil && autostartPaused != true }
 
+    /// Apply the default once; explicit pauses and existing approvals remain unchanged.
+    public func applyingDefaultAutostart() -> DevProject {
+        guard autostartApproval == nil, autostartPaused != true,
+              let approval = try? AutostartApproval.capture(project: self) else { return self }
+        var updated = self
+        updated.autostartApproval = approval
+        updated.autostartPaused = false
+        return updated
+    }
+
     public var name: String {
         URL(fileURLWithPath: directoryPath).lastPathComponent
     }

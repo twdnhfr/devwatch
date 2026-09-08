@@ -154,7 +154,7 @@ Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs 
 1. Über das Ordnersymbol links unten „Ordner hinzufügen …“ öffnen und beispielsweise `~/gits` wählen. Git-Repositories und Worktrees werden rekursiv gefunden. Alternativ im Menü der Ordnerverwaltung ein einzelnes Webprojekt hinzufügen.
 2. Ein Projekt in der durchsuchbaren Liste auswählen. Einstellungen und Ausgaben stehen bei Bedarf unter „Details & Logs“.
 3. Falls erforderlich den Programmnamen durch einen absoluten Pfad ersetzen und speichern.
-4. Noch nicht freigegebene Projekte werden zunächst nur beobachtet. Bei der ersten relevanten Dateiänderung erscheint ein Hinweis direkt am Menüleisten-Icon mit Projekt, Befehl und Script-Vorschau. Ein Klick auf „Autostart freigeben …“ im Hinweis erteilt die Freigabe und startet den Prozess sofort.
+4. Autostart ist für neu erkannte, gültige Projekte standardmäßig eingeschaltet. Bisher unentschiedene Projekte werden beim App-Start ebenfalls freigegeben; bewusst pausierte Projekte bleiben pausiert. Die Freigabe speichert den aktuellen Befehl und Manifeststand. Erst die nächste relevante Dateiänderung startet den Prozess.
 5. Alternativ im Projektfenster den Schalter „Autostart“ einschalten: Dort startet die Freigabe allein nichts; erst eine folgende Dateiänderung startet den Prozess. „Starten“ bleibt als manuelle Aktion verfügbar.
 6. Mit „Stoppen“ beenden und den Autostart pausieren. Eine Pause bleibt über App-Neustarts erhalten. „Autostart pausieren“ lässt einen bereits laufenden Prozess weiterlaufen.
 7. Zum Fortsetzen erneut freigeben. Das Schließen des Fensters lässt die App in der Menüleiste weiterlaufen; „DevWatch beenden“ beendet Beobachtung und Prozesse, ohne eine zuvor aktive Freigabe zu pausieren.

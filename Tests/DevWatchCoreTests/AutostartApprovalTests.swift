@@ -32,6 +32,24 @@ final class AutostartApprovalTests: XCTestCase {
         XCTAssertTrue(restored.matches(project: project))
     }
 
+    func testDefaultAutostartApprovesValidProjectButPreservesPause() throws {
+        let enabled = project.applyingDefaultAutostart()
+        XCTAssertTrue(enabled.autostartEnabled)
+        XCTAssertTrue(try XCTUnwrap(enabled.autostartApproval).matches(project: enabled))
+        var paused = project!
+        paused.autostartPaused = true
+        XCTAssertEqual(paused.applyingDefaultAutostart(), paused)
+    }
+
+    func testDefaultAutostartDoesNotReplaceStaleApprovalOrApproveInvalidManifest() throws {
+        let enabled = project.applyingDefaultAutostart()
+        try writeManifest(manifest + "\n")
+        XCTAssertEqual(enabled.applyingDefaultAutostart(), enabled)
+        XCTAssertFalse(try XCTUnwrap(enabled.autostartApproval).matches(project: enabled))
+        try writeManifest("{}")
+        XCTAssertFalse(project.applyingDefaultAutostart().autostartEnabled)
+    }
+
     func testEveryRawManifestChangeInvalidatesApproval() throws {
         let approval = try AutostartApproval.capture(project: project)
         try writeManifest(manifest + "\n")
