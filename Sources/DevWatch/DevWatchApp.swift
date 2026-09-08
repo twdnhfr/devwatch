@@ -12,6 +12,15 @@ struct DevWatchApp: App {
                 .onAppear { delegate.configure(model: model) }
         }
         .defaultSize(width: 760, height: 460)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Einstellungen …") {
+                    model.openProjectsWindow?()
+                    model.showFolders = true
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
 
 
     }
