@@ -87,7 +87,7 @@ final class ProjectAutomationTests: XCTestCase {
             try fixture.enable()
             fixture.automation.startManually()
             let completed = try await eventually {
-                fixture.launchCount == 1 && fixture.automation.status.contains("Build abgeschlossen")
+                fixture.launchCount == 1 && fixture.automation.status == L10n.text("Build completed — waiting for a file change")
             }
             XCTAssertTrue(completed)
             XCTAssertTrue(fixture.automation.project.autostartEnabled)

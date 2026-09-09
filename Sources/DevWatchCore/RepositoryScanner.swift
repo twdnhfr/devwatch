@@ -37,13 +37,13 @@ public enum RepositoryScanner {
 
         for root in roots {
             guard !root.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                warnings.insert("Ein Suchordner hat einen leeren Pfad und wurde übersprungen.")
+                warnings.insert(L10n.text("A search folder has an empty path and was skipped."))
                 continue
             }
             let url = URL(fileURLWithPath: root).standardizedFileURL.resolvingSymlinksInPath()
             var isDirectory: ObjCBool = false
             guard manager.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-                warnings.insert("Suchordner fehlt oder ist kein Verzeichnis: \(url.path)")
+                warnings.insert(L10n.text("Search folder is missing or is not a directory: %@", String(describing: url.path)))
                 continue
             }
             pending.append(url)
@@ -51,7 +51,7 @@ public enum RepositoryScanner {
 
         while let directory = pending.popLast() {
             if Task.isCancelled {
-                warnings.insert("Die Repository-Suche wurde abgebrochen; die Ergebnisse sind unvollständig.")
+                warnings.insert(L10n.text("Repository scan cancelled; results are incomplete."))
                 break
             }
             guard visited.insert(directory.path).inserted else { continue }
@@ -59,7 +59,7 @@ public enum RepositoryScanner {
             do {
                 entries = try manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys))
             } catch {
-                warnings.insert("Ordner konnte nicht gelesen werden: \(directory.path). \(error.localizedDescription)")
+                warnings.insert(L10n.text("Could not read folder: %@. %@", String(describing: directory.path), String(describing: error.localizedDescription)))
                 continue
             }
 
@@ -80,7 +80,7 @@ public enum RepositoryScanner {
                                !marker.dropFirst("gitdir:".count).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 isRepository = true
                             } else {
-                                warnings.insert("Ungültige Git-Verweisdatei: \(entry.path)")
+                                warnings.insert(L10n.text("Invalid Git reference file: %@", String(describing: entry.path)))
                             }
                         }
                         continue
@@ -89,7 +89,7 @@ public enum RepositoryScanner {
                         pending.append(entry.standardizedFileURL)
                     }
                 } catch {
-                    warnings.insert("Eintrag konnte nicht geprüft werden: \(entry.path). \(error.localizedDescription)")
+                    warnings.insert(L10n.text("Could not inspect entry: %@. %@", String(describing: entry.path), String(describing: error.localizedDescription)))
                 }
             }
 
@@ -98,14 +98,14 @@ public enum RepositoryScanner {
             let issue: String?
             if !manager.fileExists(atPath: directory.appendingPathComponent("package.json").path) {
                 project = nil
-                issue = "Keine package.json gefunden; kein Frontend-Entwicklungsbefehl erkannt."
+                issue = L10n.text("No package.json found; no frontend development command detected.")
             } else {
                 do {
                     project = try ProjectDiscovery.inspect(directory: directory)
                     issue = nil
                 } catch {
                     project = nil
-                    issue = "Frontend-Konfiguration konnte nicht erkannt werden: \(error.localizedDescription)"
+                    issue = L10n.text("Could not detect frontend configuration: %@", String(describing: error.localizedDescription))
                 }
             }
             repositories.append(DiscoveredRepository(directoryPath: directory.path, project: project, issue: issue))

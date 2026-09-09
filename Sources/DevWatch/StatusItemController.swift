@@ -74,17 +74,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             menu.addItem(item)
         }
         if let update = model.updates.available {
-            add("Version \(update.displayVersion) laden …", #selector(openUpdate))
+            add(L10n.text("Download version %@ …", String(describing: update.displayVersion)), #selector(openUpdate))
             menu.addItem(.separator())
         }
-        add("Projekte …", #selector(openProjects))
-        add("Einstellungen …", #selector(openFolders))
+        add(L10n.text("Projects …"), #selector(openProjects))
+        add(L10n.text("Settings …"), #selector(openFolders))
         if model.runningCount > 0 {
             menu.addItem(.separator())
-            add("Alle stoppen", #selector(stopAll))
+            add(L10n.text("Stop all"), #selector(stopAll))
         }
         menu.addItem(.separator())
-        add("DevWatch beenden", #selector(quit))
+        add(L10n.text("Quit DevWatch"), #selector(quit))
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
     }
 
@@ -151,9 +151,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let dark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         button.image = MenuBarIcon.make(running: model.runningCount > 0, scanning: model.isScanning, dark: dark)
         let status = model.runningCount > 0
-            ? "\(model.runningCount) Entwicklungsprozesse laufen"
-            : (model.isScanning ? "Git-Projekte werden gesucht" : "Keine Entwicklungsprozesse aktiv")
-        let promptHint = model.approvalPrompts.isEmpty ? "" : " · Freigabe wartet"
+            ? L10n.text("Running development processes: %@", String(describing: model.runningCount))
+            : (model.isScanning ? L10n.text("Scanning for Git projects") : L10n.text("No development processes running"))
+        let promptHint = model.approvalPrompts.isEmpty ? "" : L10n.text(" · Approval pending")
         button.toolTip = "DevWatch: \(status)\(promptHint)"
         button.setAccessibilityLabel("DevWatch: \(status)\(promptHint)")
 
@@ -191,7 +191,7 @@ private struct StatusPopoverView: View {
                 Text("DevWatch").font(.headline)
                 Spacer()
                 if model.isScanning { ProgressView().controlSize(.small) }
-                Label("\(model.runningCount) aktiv", systemImage: "circle.fill")
+                Label(L10n.text("Active: %@", String(describing: model.runningCount)), systemImage: "circle.fill")
                     .font(.caption)
                     .foregroundStyle(model.runningCount > 0 ? Color.green : Color.secondary)
             }
@@ -199,7 +199,7 @@ private struct StatusPopoverView: View {
                 ActivityApprovalCard(model: model, prompt: prompt)
                     .id(prompt.id)
             } else if model.scriptProjects.isEmpty {
-                Text(model.isScanning ? "Projekte werden gesucht …" : "Wartet auf Dateiänderungen.")
+                Text(model.isScanning ? L10n.text("Scanning for projects …") : L10n.text("Waiting for file changes."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -211,7 +211,7 @@ private struct StatusPopoverView: View {
                 .frame(maxHeight: 150)
             }
             if model.approvalPrompts.count > 1 {
-                Text("\(model.approvalPrompts.count - 1) weitere")
+                Text(L10n.text("More: %@", String(describing: model.approvalPrompts.count - 1)))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -254,17 +254,17 @@ private struct ActivityApprovalCard: View {
                 .font(.system(.callout, design: .monospaced))
                 .textSelection(.enabled)
                 .lineLimit(2)
-            Text("Änderung erkannt. Freigeben startet jetzt.")
+            Text(L10n.text("Change detected. Approving starts the process now."))
                 .font(.caption).foregroundStyle(.secondary)
-            DisclosureGroup("Details", isExpanded: $detailsExpanded) {
+            DisclosureGroup(L10n.text("Details"), isExpanded: $detailsExpanded) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(prompt.project.directoryPath)
                             .foregroundStyle(.secondary)
-                        Text("Geänderte Dateien").bold()
+                        Text(L10n.text("Changed files")).bold()
                         Text(prompt.changedFiles.joined(separator: "\n"))
                             .font(.system(.caption, design: .monospaced))
-                        Text("Befehl und Scripts").bold()
+                        Text(L10n.text("Command and scripts")).bold()
                         Text(([prompt.project.executable] + prompt.project.arguments).joined(separator: " ") + "\n" + prompt.script)
                             .font(.system(.caption, design: .monospaced))
                     }
@@ -277,9 +277,9 @@ private struct ActivityApprovalCard: View {
             }
             .font(.caption)
             HStack {
-                Button("Später") { model.dismissActivity(prompt) }
+                Button(L10n.text("Later")) { model.dismissActivity(prompt) }
                 Spacer()
-                Button("Autostart freigeben …") { model.approveActivity(prompt) }
+                Button(L10n.text("Approve autostart …")) { model.approveActivity(prompt) }
                     .buttonStyle(.borderedProminent)
             }
         }

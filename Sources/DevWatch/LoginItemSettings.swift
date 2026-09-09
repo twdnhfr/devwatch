@@ -1,3 +1,4 @@
+import DevWatchCore
 import Combine
 import ServiceManagement
 
@@ -17,7 +18,7 @@ final class LoginItemSettings: ObservableObject {
             if enabled { try SMAppService.mainApp.register() }
             else { try SMAppService.mainApp.unregister() }
         } catch {
-            errorMessage = "Autostart konnte nicht geändert werden: \(error.localizedDescription)"
+            errorMessage = L10n.text("Could not change launch at login: %@", String(describing: error.localizedDescription))
         }
         refresh()
     }

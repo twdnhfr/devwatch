@@ -6,7 +6,8 @@ import Foundation
 public final class ProjectAutomation: ObservableObject {
     public let process = DevelopmentProcess()
     @Published public private(set) var project: DevProject
-    @Published public private(set) var status = "Autostart nicht freigegeben"
+    @Published public private(set) var status = L10n.text("Autostart not approved")
+    @Published public private(set) var needsAttention = false
     @Published public private(set) var lastChange: String?
     @Published public private(set) var idleDeadline: Date?
     private let inactivityTimeout: TimeInterval
@@ -40,10 +41,11 @@ public final class ProjectAutomation: ObservableObject {
     }
 
     public func beginObserving() {
+        needsAttention = false
         watcher?.stop()
         watcher = nil
         guard !shuttingDown, project.autostartPaused != true || process.isRunning else {
-            status = "Autostart pausiert"
+            status = L10n.text("Autostart paused")
             return
         }
         if project.autostartEnabled, let approval = project.autostartApproval, !approval.matches(project: project) {
@@ -57,9 +59,9 @@ public final class ProjectAutomation: ObservableObject {
             try observer.start()
             watcher = observer
             status = project.autostartApproval == nil
-                ? "Beobachtet Änderungen – Start noch nicht freigegeben"
-                : "Autostart aktiv – wartet auf Dateiänderung"
-        } catch { pause(reason: "Dateibeobachtung fehlgeschlagen: \(error.localizedDescription)") }
+                ? L10n.text("Watching for changes — start not yet approved")
+                : L10n.text("Autostart enabled — waiting for a file change")
+        } catch { pause(reason: L10n.text("File watching failed: %@", String(describing: error.localizedDescription))) }
     }
 
     /// Approval is captured when the dialog opens and rechecked when confirmed.
@@ -90,7 +92,7 @@ public final class ProjectAutomation: ObservableObject {
         beginObserving()
     }
 
-    public func pause(reason: String = "Autostart pausiert") {
+    public func pause(reason: String? = nil) {
         if !process.isRunning {
             watcher?.stop()
             watcher = nil
@@ -100,7 +102,8 @@ public final class ProjectAutomation: ObservableObject {
         project = updated // Fail closed even when persistence fails.
         _ = persist(updated)
         // Keep an existing observer for a running server's idle timer, but never rearm on observer errors.
-        status = reason
+        needsAttention = reason != nil
+        status = reason ?? L10n.text("Autostart paused")
     }
 
     public func startManually() {
@@ -165,7 +168,7 @@ public final class ProjectAutomation: ObservableObject {
                       executable: project.executable, arguments: project.arguments)
         if !process.isRunning {
             cancelIdleTimer()
-            pause(reason: "Start fehlgeschlagen – Autostart pausiert")
+            pause(reason: L10n.text("Start failed — autostart paused"))
         } else {
             resetIdleTimer()
             if watcher == nil { beginObserving() }
@@ -189,7 +192,7 @@ public final class ProjectAutomation: ObservableObject {
             self.idleDeadline = nil
             self.idleStopInProgress = true
             self.activityWhileStopping = false
-            self.status = "Inaktivität – Prozess wird beendet"
+            self.status = L10n.text("Inactive — stopping process")
             self.process.stop()
         }
     }
@@ -216,11 +219,11 @@ public final class ProjectAutomation: ObservableObject {
                 beginObserving()
             }
             if restart { launch() }
-            else { status = "Nach Inaktivität gestoppt" }
+            else { status = L10n.text("Stopped after inactivity") }
         } else if project.arguments == ["run", "build"], process.errorMessage == nil, project.autostartEnabled {
-            status = "Build abgeschlossen – wartet auf Dateiänderung"
+            status = L10n.text("Build completed — waiting for a file change")
         } else if project.autostartEnabled {
-            pause(reason: "Prozess beendet – Autostart pausiert")
+            pause(reason: L10n.text("Process ended — autostart paused"))
         } else if project.autostartPaused == true {
             watcher?.stop()
             watcher = nil
@@ -230,6 +233,7 @@ public final class ProjectAutomation: ObservableObject {
     }
 
     private func invalidateApproval() {
+        needsAttention = true
         if !process.isRunning {
             watcher?.stop()
             watcher = nil
@@ -239,6 +243,6 @@ public final class ProjectAutomation: ObservableObject {
         updated.autostartPaused = true
         project = updated
         _ = persist(updated)
-        status = "Projekt oder Befehl geändert – erneut freigeben"
+        status = L10n.text("Project or command changed — approve again")
     }
 }

@@ -15,7 +15,7 @@ struct DevWatchApp: App {
         .defaultSize(width: 760, height: 460)
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Einstellungen …") {
+                Button(L10n.text("Settings …")) {
                     model.openProjectsWindow?()
                     model.showFolders = true
                 }

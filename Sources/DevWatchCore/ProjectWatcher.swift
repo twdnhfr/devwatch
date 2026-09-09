@@ -34,7 +34,7 @@ public final class ProjectWatcher {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory),
               isDirectory.boolValue else {
-            throw WatcherError("Projektordner ist nicht mehr vorhanden.")
+            throw WatcherError(L10n.text("The project folder no longer exists."))
         }
         generation = UUID()
         startedAt = Date().timeIntervalSince1970
@@ -63,13 +63,13 @@ public final class ProjectWatcher {
             }
         }, &context, [watchedPath] as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             0.15, flags) else {
-            throw WatcherError("Dateibeobachtung konnte nicht eingerichtet werden.")
+            throw WatcherError(L10n.text("Could not set up file watching."))
         }
         FSEventStreamSetDispatchQueue(created, DispatchQueue.main)
         guard FSEventStreamStart(created) else {
             FSEventStreamInvalidate(created)
             FSEventStreamRelease(created)
-            throw WatcherError("Dateibeobachtung konnte nicht gestartet werden.")
+            throw WatcherError(L10n.text("Could not start file watching."))
         }
         stream = created
     }
@@ -103,7 +103,7 @@ public final class ProjectWatcher {
             kFSEventStreamEventFlagEventIdsWrapped | kFSEventStreamEventFlagRootChanged |
             kFSEventStreamEventFlagUnmount)
         if flags.contains(where: { $0 & invalid != 0 }) {
-            fail("Dateibeobachtung pausiert: Projektordner wurde verschoben oder Dateiänderungen konnten nicht vollständig erfasst werden. Bitte Projekt prüfen und erneut aktivieren.")
+            fail(L10n.text("File watching paused: the project folder was moved or file changes could not be fully captured. Review the project and enable it again."))
             return
         }
         let prefix = watchedPath + "/"

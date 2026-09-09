@@ -52,7 +52,7 @@ final class AppModel: ObservableObject {
             self?.objectWillChange.send()
         }
         do { rootSettings = try rootStorage.load() }
-        catch { rootsAvailable = false; errorMessage = "Stammordner konnten nicht geladen werden: \(error.localizedDescription)" }
+        catch { rootsAvailable = false; errorMessage = L10n.text("Could not load root folders: %@", String(describing: error.localizedDescription)) }
         do {
             projects = try storage.load()
             let defaults = projects.map { $0.applyingDefaultAutostart() }
@@ -68,7 +68,7 @@ final class AppModel: ObservableObject {
             refreshScripts()
         } catch {
             storageAvailable = false
-            errorMessage = "Projektliste konnte nicht geladen werden: \(error.localizedDescription)"
+            errorMessage = L10n.text("Could not load the project list: %@", String(describing: error.localizedDescription))
         }
     }
 
@@ -104,8 +104,8 @@ final class AppModel: ObservableObject {
 
     func addRootFolder() {
         let panel = NSOpenPanel()
-        panel.title = "Stammordner hinzufügen"
-        panel.message = "Git-Repositories und Worktrees werden rekursiv gesucht. Es werden keine Entwicklungsprozesse gestartet."
+        panel.title = L10n.text("Add root folder")
+        panel.message = L10n.text("Git repositories and worktrees are scanned recursively. No development processes will be started.")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
@@ -158,7 +158,7 @@ final class AppModel: ObservableObject {
                 if repository.project == nil,
                    let existing = self.automations.values.first(where: { $0.project.directoryPath == repository.directoryPath }),
                    existing.project.autostartEnabled {
-                    existing.pause(reason: repository.issue ?? "Kein Entwicklungsbefehl erkannt")
+                    existing.pause(reason: repository.issue ?? L10n.text("No development command detected"))
                 }
             }
             do {
@@ -178,7 +178,7 @@ final class AppModel: ObservableObject {
 
     private func saveRoots(_ updated: RootFolderSettings) -> Bool {
         guard rootsAvailable else {
-            errorMessage = "Die bestehende Stammordner-Datei ist nicht lesbar und wird nicht überschrieben."
+            errorMessage = L10n.text("The existing root folder file cannot be read and will not be overwritten.")
             return false
         }
         do { try rootStorage.save(updated); rootSettings = updated; return true }
@@ -237,7 +237,7 @@ final class AppModel: ObservableObject {
         do {
             let scripts = try ProjectDiscovery.scripts(directory: URL(fileURLWithPath: project.directoryPath))
             guard scripts[name] != nil else {
-                throw NSError(domain: "DevWatch", code: 2, userInfo: [NSLocalizedDescriptionKey: "Das Script \(name) ist nicht mehr vorhanden."])
+                throw NSError(domain: "DevWatch", code: 2, userInfo: [NSLocalizedDescriptionKey: L10n.text("The script %@ no longer exists.", String(describing: name))])
             }
             if project.arguments == ["run", name] {
                 automation(for: project).startManually()
@@ -293,8 +293,8 @@ final class AppModel: ObservableObject {
 
     func addProject() {
         let panel = NSOpenPanel()
-        panel.title = "Entwicklungsprojekt auswählen"
-        panel.message = "Wähle den Projektordner mit seiner package.json. Es wird noch kein Befehl gestartet."
+        panel.title = L10n.text("Select development project")
+        panel.message = L10n.text("Select the project folder containing package.json. No command will be started yet.")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -347,7 +347,7 @@ final class AppModel: ObservableObject {
         }
         guard prompt.approval.matches(project: current) else {
             dismissActivity(prompt)
-            errorMessage = "Das Projekt oder der Befehl wurde seit dem Hinweis geändert. Bitte die aktuelle Konfiguration im Projektfenster prüfen und erneut freigeben."
+            errorMessage = L10n.text("The project or command has changed since this prompt appeared. Review the current configuration in the project window and approve it again.")
             selectedPath = current.directoryPath
             openProjectsWindow?()
             return
@@ -402,7 +402,7 @@ final class AppModel: ObservableObject {
     private func persist(_ updated: [DevProject]) throws {
         guard storageAvailable else {
             throw NSError(domain: "DevWatch", code: 1, userInfo: [NSLocalizedDescriptionKey:
-                "Die vorhandene Projektdatei konnte nicht gelesen werden und wird nicht überschrieben. Prüfe ~/Library/Application Support/DevWatch/projects.json und starte die App erneut."])
+                L10n.text("The existing project file could not be read and will not be overwritten. Check ~/Library/Application Support/DevWatch/projects.json and restart the app.")])
         }
         try storage.save(updated)
         projects = updated

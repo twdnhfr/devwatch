@@ -65,7 +65,7 @@ public final class DevelopmentProcess: ObservableObject {
         }
         guard let resolved, !executable.isEmpty else {
             state = .failed
-            errorMessage = "Programm nicht gefunden: \(executable). Bitte Installation oder absoluten Pfad prüfen."
+            errorMessage = L10n.text("Executable not found: %@. Check the installation or specify an absolute path.", String(describing: executable))
             return
         }
         do {
@@ -74,7 +74,7 @@ public final class DevelopmentProcess: ObservableObject {
             child = launched.child
             state = .running
             isRunning = true
-            append("Gestartet: \(resolved) \(arguments.joined(separator: " "))\n")
+            append(L10n.text("Started: %@ %@\n", String(describing: resolved), String(describing: arguments.joined(separator: " "))))
             // A dedicated reader prevents full stdout/stderr pipes from blocking the server.
             DispatchQueue.global(qos: .utility).async { [weak self] in
                 defer { close(launched.output) }
@@ -103,9 +103,9 @@ public final class DevelopmentProcess: ObservableObject {
                     self.exitCode = status
                     self.state = self.requestedStop ? .stopped : (status == 0 ? .succeeded : .failed)
                     if !self.requestedStop && status != 0 {
-                        self.errorMessage = "Prozess beendet (Status \(status)). Details stehen im Log."
+                        self.errorMessage = L10n.text("Process exited (status %@). See the log for details.", String(describing: status))
                     }
-                    self.append("\nProzess beendet.\n")
+                    self.append(L10n.text("\nProcess ended.\n"))
                     // Subscribers to isRunning must already see the final result.
                     self.isRunning = false
                 }

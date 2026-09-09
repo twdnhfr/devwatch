@@ -14,13 +14,13 @@ public struct AutostartApproval: Codable, Equatable, Sendable {
         public var errorDescription: String? {
             switch self {
             case .unsupportedCommand:
-                return "Autostart benötigt einen Programmnamen oder absoluten Programmpfad mit den Argumenten run dev oder run build."
+                return L10n.text("Autostart requires an executable name or absolute path with the arguments run dev or run build.")
             case .unreadableManifest:
-                return "Die package.json des Projekts konnte nicht gelesen werden. Bitte Pfad und Zugriffsrechte prüfen."
+                return L10n.text("Could not read the project's package.json. Check the path and access permissions.")
             case .invalidManifest:
-                return "Die package.json ist ungültig oder enthält keine gültigen Script-Angaben."
+                return L10n.text("The package.json file is invalid or contains no valid script definitions.")
             case .missingDevScript:
-                return "Die package.json enthält kein ausführbares Script für den gewählten Befehl."
+                return L10n.text("The package.json file contains no runnable script for the selected command.")
             }
         }
     }

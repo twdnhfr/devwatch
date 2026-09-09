@@ -121,6 +121,11 @@ done
 iconutil -c icns "$iconset" -o "$app_dir/Contents/Resources/DevWatch.icns"
 cp "$binary_dir/DevWatch" "$app_dir/Contents/MacOS/DevWatch"
 cp Support/Info.plist "$app_dir/Contents/Info.plist"
+# SwiftPM keeps localized strings in a resource bundle; ship it with the app.
+ditto "$binary_dir/DevWatch_DevWatchCore.bundle" "$app_dir/Contents/Resources/DevWatch_DevWatchCore.bundle"
+for language in en de; do
+    ditto "Support/$language.lproj" "$app_dir/Contents/Resources/$language.lproj"
+done
 
 # Eine stabile Signatur hält die einmal erteilten Ordner-Berechtigungen (TCC) über
 # Builds hinweg gültig; ad-hoc ("-") wechselt bei jedem Build die Identität.

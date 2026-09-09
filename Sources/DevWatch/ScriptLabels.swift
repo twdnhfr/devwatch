@@ -26,7 +26,7 @@ struct ScriptLabels: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(name): \(description(for: state))")
-                    .help("\(project.executable) run \(name) · \(description(for: state))\nKlicken zum \(process?.isRunning == true ? "Stoppen" : "Starten")" +
+                    .help(L10n.text("%@ run %@ · %@\nClick to %@", String(describing: project.executable), String(describing: name), String(describing: description(for: state)), String(describing: process?.isRunning == true ? L10n.text("Stop") : L10n.text("Start"))) +
                           (process?.errorMessage.map { "\n" + $0 } ?? ""))
                 }
             }
@@ -53,11 +53,11 @@ struct ScriptLabels: View {
 
     private func description(for state: DevelopmentProcess.State) -> String {
         switch state {
-        case .idle: return "Bereit"
-        case .running: return "Läuft"
-        case .stopped: return "Gestoppt"
-        case .succeeded: return "Erfolgreich"
-        case .failed: return "Fehlgeschlagen"
+        case .idle: return L10n.text("Ready")
+        case .running: return L10n.text("Running")
+        case .stopped: return L10n.text("Stopped")
+        case .succeeded: return L10n.text("Succeeded")
+        case .failed: return L10n.text("Failed")
         }
     }
 }

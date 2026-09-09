@@ -24,21 +24,21 @@ struct ProjectsView: View {
                         .help(repository.directoryPath)
                 }
             }
-            .searchable(text: $search, placement: .sidebar, prompt: "Projekt suchen")
+            .searchable(text: $search, placement: .sidebar, prompt: L10n.text("Search projects"))
             .navigationSplitViewColumnWidth(min: 190, ideal: 220)
             .safeAreaInset(edge: .bottom) {
                 HStack {
                     Button { model.showFolders = true } label: {
                         Image(systemName: "folder.badge.gearshape")
-                    }.help("Einstellungen").accessibilityLabel("Einstellungen")
-                    Text("\(visibleRepositories.count) Projekte")
+                    }.help(L10n.text("Settings")).accessibilityLabel(L10n.text("Settings"))
+                    Text(L10n.text("Projects: %@", String(describing: visibleRepositories.count)))
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     if model.isScanning {
-                        ProgressView().controlSize(.small).accessibilityLabel("Projekte werden gesucht")
+                        ProgressView().controlSize(.small).accessibilityLabel(L10n.text("Scanning for projects"))
                     } else {
                         Button(action: model.rescan) { Image(systemName: "arrow.clockwise") }
-                            .help("Projekte aktualisieren").accessibilityLabel("Projekte aktualisieren")
+                            .help(L10n.text("Refresh projects")).accessibilityLabel(L10n.text("Refresh projects"))
                     }
                 }.buttonStyle(.borderless).padding(12).background(.bar)
             }
@@ -47,17 +47,17 @@ struct ProjectsView: View {
                let issue = repository.issue {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(repository.name).font(.title.bold())
-                    Text("Kein Entwicklungsbefehl erkannt.").foregroundStyle(.secondary)
-                    DisclosureGroup("Details") {
+                    Text(L10n.text("No development command detected.")).foregroundStyle(.secondary)
+                    DisclosureGroup(L10n.text("Details")) {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(repository.directoryPath).textSelection(.enabled)
                             Text(issue).textSelection(.enabled)
-                            Button("Erneut prüfen", action: model.rescan).disabled(model.isScanning)
+                            Button(L10n.text("Check again"), action: model.rescan).disabled(model.isScanning)
                         }.font(.callout).padding(.top, 10)
                     }
                     if let saved = model.projects.first(where: { $0.directoryPath == repository.directoryPath }),
                        model.automation(for: saved).process.isRunning {
-                        Button("Stoppen") { model.automation(for: saved).stopManually() }
+                        Button(L10n.text("Stop")) { model.automation(for: saved).stopManually() }
                     }
                     Spacer()
                 }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
@@ -67,12 +67,12 @@ struct ProjectsView: View {
                     .id(project.id)
             } else {
                 ContentUnavailableView {
-                    Label("Deine Projekte", systemImage: "folder")
+                    Label(L10n.text("Your projects"), systemImage: "folder")
                 } description: {
-                    Text(model.rootSettings.paths.isEmpty ? "Wähle einmal deinen Git-Ordner." : "Wähle links ein Projekt aus.")
+                    Text(model.rootSettings.paths.isEmpty ? L10n.text("Select your Git folder to get started.") : L10n.text("Select a project on the left."))
                 } actions: {
                     if model.rootSettings.paths.isEmpty {
-                        Button("Ordner auswählen …", action: model.addRootFolder).buttonStyle(.borderedProminent)
+                        Button(L10n.text("Select folder …"), action: model.addRootFolder).buttonStyle(.borderedProminent)
                     }
                 }
             }
@@ -91,25 +91,25 @@ struct ProjectsView: View {
         }
         .frame(minWidth: 660, minHeight: 400)
         .sheet(isPresented: $model.showFolders) { foldersSheet }
-        .alert("Aktion nicht möglich", isPresented: Binding(
+        .alert(L10n.text("Action unavailable"), isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
         )) {
-            Button("OK") { model.errorMessage = nil }
+            Button(L10n.text("OK")) { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
     }
 
     private var foldersSheet: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Einstellungen").font(.title2.bold())
-            Toggle("Beim Anmelden starten", isOn: Binding(
+            Text(L10n.text("Settings")).font(.title2.bold())
+            Toggle(L10n.text("Launch at login"), isOn: Binding(
                 get: { loginItem.isRegistered },
                 set: { loginItem.setEnabled($0) }
             ))
             if loginItem.requiresApproval {
-                Text("Bitte den Autostart in den macOS-Systemeinstellungen erlauben.")
+                Text(L10n.text("Please allow launch at login in macOS System Settings."))
                     .font(.caption).foregroundStyle(.secondary)
-                Button("Anmeldeobjekte öffnen", action: loginItem.openSystemSettings)
+                Button(L10n.text("Open Login Items"), action: loginItem.openSystemSettings)
             }
             if let error = loginItem.errorMessage {
                 Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
@@ -121,23 +121,23 @@ struct ProjectsView: View {
                 // Ohne Fund bleibt die Zeile stumm: eine gescheiterte Prüfung
                 // ist von "keine neue Version" nicht zu unterscheiden.
                 if let update = model.updates.available {
-                    Link("Version \(update.displayVersion) laden …", destination: update.pageURL)
+                    Link(L10n.text("Download version %@ …", String(describing: update.displayVersion)), destination: update.pageURL)
                         .font(.callout)
                 }
             }
             Divider()
             HStack {
-                Text("Projektordner").font(.headline)
+                Text(L10n.text("Project folders")).font(.headline)
                 Spacer()
                 Button(action: model.addRootFolder) {
                     Image(systemName: "plus")
                 }
-                .help("Ordner hinzufügen")
-                .accessibilityLabel("Ordner hinzufügen")
+                .help(L10n.text("Add folder"))
+                .accessibilityLabel(L10n.text("Add folder"))
             }
             VStack(spacing: 0) {
                 if model.rootSettings.paths.isEmpty {
-                    Text("Mit + einen Ordner hinzufügen")
+                    Text(L10n.text("Use + to add a folder"))
                         .font(.callout).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -154,8 +154,8 @@ struct ProjectsView: View {
                                         Image(systemName: "minus")
                                     }
                                     .buttonStyle(.borderless)
-                                    .help("Ordner aus der Liste entfernen; Projekte behalten")
-                                    .accessibilityLabel("Ordner \(path) entfernen")
+                                    .help(L10n.text("Remove folder from the list; keep its projects"))
+                                    .accessibilityLabel(L10n.text("Remove folder %@", String(describing: path)))
                                 }
                                 .padding(.horizontal, 12).frame(height: 40)
                                 if path != model.rootSettings.paths.last {
@@ -168,7 +168,7 @@ struct ProjectsView: View {
                 }
             }
             .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
-            Text("Git-Projekte darin werden automatisch erkannt.")
+            Text(L10n.text("Git projects inside these folders are discovered automatically."))
                 .font(.caption).foregroundStyle(.secondary)
             if !model.scanWarnings.isEmpty {
                 ScrollView { Text(model.scanWarnings.joined(separator: "\n")).font(.caption).foregroundStyle(.orange) }
@@ -176,7 +176,7 @@ struct ProjectsView: View {
             }
             HStack {
                 Spacer()
-                Button("Fertig") { model.showFolders = false }.keyboardShortcut(.defaultAction)
+                Button(L10n.text("Done")) { model.showFolders = false }.keyboardShortcut(.defaultAction)
             }
         }.padding(24).frame(width: 470)
             .onAppear { loginItem.refresh() }
@@ -209,19 +209,19 @@ private struct ProjectDetail: View {
                     Text(([project.executable] + project.arguments).joined(separator: " "))
                         .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
                     ScriptLabels(model: model, project: project)
-                    Label(process.isRunning ? "Prozess läuft" : (project.autostartEnabled ? "Wartet auf Dateiänderung" : "Gestoppt"),
+                    Label(process.isRunning ? L10n.text("Process running") : (project.autostartEnabled ? L10n.text("Waiting for a file change") : L10n.text("Stopped")),
                           systemImage: "circle.fill")
                         .font(.callout)
                         .foregroundStyle(process.isRunning ? Color.green : Color.secondary)
                 }
                 HStack(spacing: 18) {
-                    Toggle("Autostart", isOn: Binding(
+                    Toggle(L10n.text("Autostart"), isOn: Binding(
                         get: { project.autostartEnabled },
                         set: { if $0 { prepareApproval() } else { automation.pause() } }
                     )).toggleStyle(.switch).fixedSize()
                         .disabled(executable != project.executable)
                     Spacer()
-                    Button(process.isRunning ? "Stoppen" : "Starten") {
+                    Button(process.isRunning ? L10n.text("Stop") : L10n.text("Start")) {
                         if process.isRunning { automation.stopManually() }
                         else { automation.startManually() }
                     }
@@ -231,41 +231,41 @@ private struct ProjectDetail: View {
                 if let error = process.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(.callout).foregroundStyle(.red).textSelection(.enabled)
-                } else if automation.status.contains("fehlgeschlagen") || automation.status.contains("erneut") || automation.status.contains("verschoben") {
+                } else if automation.needsAttention {
                     Text(automation.status).font(.callout).foregroundStyle(.orange)
                 }
                 Divider()
-                DisclosureGroup("Details & Logs", isExpanded: $showDetails) {
+                DisclosureGroup(L10n.text("Details & Logs"), isExpanded: $showDetails) {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(project.directoryPath).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         HStack {
-                            TextField("Programm oder Pfad", text: $executable)
+                            TextField(L10n.text("Executable or path"), text: $executable)
                                 .textFieldStyle(.roundedBorder).disabled(process.isRunning).onSubmit(saveExecutable)
                             Text(project.arguments.joined(separator: " ")).font(.system(.caption, design: .monospaced))
-                            Button("Speichern", action: saveExecutable)
+                            Button(L10n.text("Save"), action: saveExecutable)
                                 .disabled(process.isRunning || executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || executable == project.executable)
                         }
                         Text(automation.status).font(.caption).foregroundStyle(.secondary)
                         if let deadline = automation.idleDeadline {
-                            Text("Automatischer Stopp um \(deadline.formatted(date: .omitted, time: .shortened)) – nach 30 Minuten ohne Dateiänderung.")
+                            Text(L10n.text("Automatic stop at %@ — after 30 minutes without file changes.", String(describing: deadline.formatted(date: .omitted, time: .shortened))))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         if let change = automation.lastChange {
-                            Text("Letzte Änderung: \(change)").font(.caption).textSelection(.enabled)
+                            Text(L10n.text("Last change: %@", String(describing: change))).font(.caption).textSelection(.enabled)
                         }
                         ScrollView([.vertical, .horizontal]) {
-                            Text(process.log.isEmpty ? "Noch keine Ausgabe." : process.log)
+                            Text(process.log.isEmpty ? L10n.text("No output yet.") : process.log)
                                 .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                                 .padding(10).frame(minWidth: 330, minHeight: 150, alignment: .topLeading)
                         }
                         .frame(height: 170)
                         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                         HStack {
-                            Button("Im Finder") {
+                            Button(L10n.text("Show in Finder")) {
                                 NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: project.directoryPath)
                             }
                             Spacer()
-                            Button("Ausblenden …", role: .destructive) { showRemoveConfirmation = true }
+                            Button(L10n.text("Hide …"), role: .destructive) { showRemoveConfirmation = true }
                                 .disabled(process.isRunning)
                         }
                     }.padding(.top, 14)
@@ -275,8 +275,8 @@ private struct ProjectDetail: View {
         .onAppear { executable = project.executable }
         .sheet(item: $approvalRequest) { request in
             VStack(alignment: .leading, spacing: 16) {
-                Text("Autostart für \(project.name)?").font(.title2.bold())
-                Text("Startet bei der nächsten Dateiänderung.").foregroundStyle(.secondary)
+                Text(L10n.text("Enable autostart for %@?", String(describing: project.name))).font(.title2.bold())
+                Text(L10n.text("Starts on the next file change.")).foregroundStyle(.secondary)
                 Text(([project.executable] + project.arguments).joined(separator: " "))
                     .font(.system(.body, design: .monospaced)).textSelection(.enabled)
                 ScrollView {
@@ -285,16 +285,16 @@ private struct ProjectDetail: View {
                 }.frame(height: 70)
                 HStack {
                     Spacer()
-                    Button("Abbrechen") { approvalRequest = nil }
-                    Button("Freigeben") {
+                    Button(L10n.text("Cancel")) { approvalRequest = nil }
+                    Button(L10n.text("Approve")) {
                         automation.enable(approval: request.approval)
                         approvalRequest = nil
                     }.buttonStyle(.borderedProminent)
                 }
             }.padding(24).frame(width: 400)
         }
-        .confirmationDialog("Projekt ausblenden? Die Dateien bleiben erhalten.", isPresented: $showRemoveConfirmation) {
-            Button("Ausblenden", role: .destructive) { model.remove(project) }
+        .confirmationDialog(L10n.text("Hide project? Its files will be kept."), isPresented: $showRemoveConfirmation) {
+            Button(L10n.text("Hide"), role: .destructive) { model.remove(project) }
         }
     }
 

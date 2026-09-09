@@ -22,7 +22,7 @@ macOS 14 or later · Apple Silicon and Intel · MIT license
 
 Development tools such as Bun or Node.js and your project dependencies must already be installed. DevWatch does not install them for you.
 
-The app interface is currently in German. The instructions below include the corresponding button labels where helpful.
+The next build supports English and German and follows your macOS language preferences, with English as the fallback. You can override the language for DevWatch in **System Settings → General → Language & Region → Applications**, then restart the app. The published 1.0.0 download still has a German interface.
 
 ## Features
 
@@ -37,10 +37,10 @@ The app interface is currently in German. The instructions below include the cor
 
 ## Getting started
 
-1. Use **“Ordner hinzufügen …”** (Add folder) to select a folder such as `~/gits`. DevWatch discovers suitable projects recursively and rescans root folders regularly.
-2. Check the detected command. Settings and process output are available under **“Details & Logs”**.
-3. Edit a source file: with autostart enabled, the development command starts automatically. You can also use **“Starten”** (Start) to run it manually.
-4. Use **“Stoppen”** (Stop) to end the process and pause autostart. Turn autostart back on when you want to resume.
+1. Use **Add folder** (“Ordner hinzufügen …” in version 1.0.0) to select a folder such as `~/gits`. DevWatch discovers suitable projects recursively and rescans root folders regularly.
+2. Check the detected command. Settings and process output are available under **Details & Logs**.
+3. Edit a source file: with autostart enabled, the development command starts automatically. You can also use **Start** (“Starten” in version 1.0.0) to run it manually.
+4. Use **Stop** (“Stoppen” in version 1.0.0) to end the process and pause autostart. Turn autostart back on when you want to resume.
 
 **Autostart is enabled by default for newly discovered, valid projects.** Adding a project does not immediately start a process; the next relevant file change runs the detected command. Review scripts in unfamiliar repositories before adding them to a watched root folder. Changes to the command or `package.json` require renewed approval.
 
@@ -96,3 +96,9 @@ Bug reports and suggestions are welcome through [GitHub Issues](https://github.c
 ## License
 
 DevWatch is open source under the [MIT license](LICENSE).
+
+## Localization
+
+User-facing strings are shared by the app and core module in `Sources/DevWatchCore/Resources/en.lproj/Localizable.strings` and `de.lproj/Localizable.strings`. Use `L10n.text` with an English key; insert dynamic values through `%@` placeholders rather than translating project names, paths, or script output.
+
+Localized macOS folder permission descriptions live in `Support/en.lproj/InfoPlist.strings` and `Support/de.lproj/InfoPlist.strings`. The app build script includes both these files and the SwiftPM resource bundle. English is the development language in `Package.swift` and `Support/Info.plist`.

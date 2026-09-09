@@ -46,11 +46,11 @@ public enum ProjectDiscovery {
         public var errorDescription: String? {
             switch self {
             case .missingDevScript:
-                return "Die package.json enthält kein ausführbares dev- oder build-Script."
+                return L10n.text("The package.json file contains no runnable dev or build script.")
             case .unsupportedPackageManager(let manager):
-                return "Der Paketmanager \(manager) wird nicht unterstützt. Unterstützt werden bun, npm, yarn und pnpm."
+                return L10n.text("The package manager %@ is not supported. Supported managers: bun, npm, yarn, and pnpm.", String(describing: manager))
             case .ambiguousLockfiles(let managers):
-                return "Lockfiles für mehrere Paketmanager gefunden: \(managers.joined(separator: ", ")). Bitte packageManager in package.json festlegen oder veraltete Lockfiles entfernen."
+                return L10n.text("Lockfiles for multiple package managers found: %@. Set packageManager in package.json or remove outdated lockfiles.", String(describing: managers.joined(separator: ", ")))
             }
         }
     }

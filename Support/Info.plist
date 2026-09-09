@@ -10,14 +10,16 @@
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0.0</string>
     <key>CFBundleVersion</key><string>1.0.0</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleLocalizations</key><array><string>en</string><string>de</string></array>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
     <!-- Endpunkt der Update-Prüfung. Beim Fork auf das eigene Repository zeigen
          lassen oder den Schlüssel entfernen, um die Prüfung abzuschalten. -->
     <key>DWReleaseFeedURL</key><string>https://api.github.com/repos/twdnhfr/devwatch/releases/latest</string>
-    <key>NSDesktopFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
-    <key>NSDocumentsFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
-    <key>NSDownloadsFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
+    <key>NSDesktopFolderUsageDescription</key><string>DevWatch watches your approved project folders for file changes.</string>
+    <key>NSDocumentsFolderUsageDescription</key><string>DevWatch watches your approved project folders for file changes.</string>
+    <key>NSDownloadsFolderUsageDescription</key><string>DevWatch watches your approved project folders for file changes.</string>
 </dict>
 </plist>
