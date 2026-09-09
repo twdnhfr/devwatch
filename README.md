@@ -10,7 +10,7 @@ DevWatch is a free, open-source macOS menu bar app. It watches your local web pr
 
 Built for workflows with Laravel, Vite, and AI coding assistants: it makes no difference whether you or an agent edits a file. DevWatch complements tools such as Laravel Herd without requiring an integration with a particular editor or agent.
 
-**[Download DevWatch 1.0.0](https://github.com/twdnhfr/devwatch/releases/download/v1.0.0/DevWatch-1.0.0.dmg)** · [All releases](https://github.com/twdnhfr/devwatch/releases) · [Report an issue](https://github.com/twdnhfr/devwatch/issues)
+**[Download DevWatch 1.0.1](https://github.com/twdnhfr/devwatch/releases/download/v1.0.1/DevWatch-1.0.1.dmg)** · [All releases](https://github.com/twdnhfr/devwatch/releases) · [Report an issue](https://github.com/twdnhfr/devwatch/issues)
 
 macOS 14 or later · Apple Silicon and Intel · MIT license
 
@@ -22,7 +22,7 @@ macOS 14 or later · Apple Silicon and Intel · MIT license
 
 Development tools such as Bun or Node.js and your project dependencies must already be installed. DevWatch does not install them for you.
 
-The next build supports English and German and follows your macOS language preferences, with English as the fallback. You can override the language for DevWatch in **System Settings → General → Language & Region → Applications**, then restart the app. The published 1.0.0 download still has a German interface.
+DevWatch supports English and German and follows your macOS language preferences, with English as the fallback. You can override the language for DevWatch in **System Settings → General → Language & Region → Applications**, then restart the app.
 
 ## Features
 
@@ -37,10 +37,10 @@ The next build supports English and German and follows your macOS language prefe
 
 ## Getting started
 
-1. Use **Add folder** (“Ordner hinzufügen …” in version 1.0.0) to select a folder such as `~/gits`. DevWatch discovers suitable projects recursively and rescans root folders regularly.
+1. Use **Add folder** to select a folder such as `~/gits`. DevWatch discovers suitable projects recursively and rescans root folders regularly.
 2. Check the detected command. Settings and process output are available under **Details & Logs**.
-3. Edit a source file: with autostart enabled, the development command starts automatically. You can also use **Start** (“Starten” in version 1.0.0) to run it manually.
-4. Use **Stop** (“Stoppen” in version 1.0.0) to end the process and pause autostart. Turn autostart back on when you want to resume.
+3. Edit a source file: with autostart enabled, the development command starts automatically. You can also use **Start** to run it manually.
+4. Use **Stop** to end the process and pause autostart. Turn autostart back on when you want to resume.
 
 **Autostart is enabled by default for newly discovered, valid projects.** Adding a project does not immediately start a process; the next relevant file change runs the detected command. Review scripts in unfamiliar repositories before adding them to a watched root folder. Changes to the command or `package.json` require renewed approval.
 
