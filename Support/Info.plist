@@ -4,14 +4,17 @@
 <dict>
     <key>CFBundleName</key><string>DevWatch</string>
     <key>CFBundleDisplayName</key><string>DevWatch</string>
-    <key>CFBundleIdentifier</key><string>local.devwatch.app</string>
+    <key>CFBundleIdentifier</key><string>de.wdnhfr.devwatch</string>
     <key>CFBundleExecutable</key><string>DevWatch</string>
     <key>CFBundleIconFile</key><string>DevWatch.icns</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>1.0.0</string>
+    <key>CFBundleVersion</key><string>1.0.0</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSDesktopFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
+    <key>NSDocumentsFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
+    <key>NSDownloadsFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
 </dict>
 </plist>

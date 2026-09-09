@@ -143,11 +143,26 @@ swift test
 ### Als Mac-App bauen
 
 ```sh
-bash scripts/build-app.sh
+bash scripts/build-app.sh            # App-Bundle nach build/DevWatch.app
+bash scripts/build-app.sh install    # zusätzlich nach /Applications kopieren und starten
 open build/DevWatch.app
 ```
 
-Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs mit Ad-hoc-Signatur. Eine Developer-ID-Signierung, Notarisierung und Verteilung an andere Nutzer sind noch nicht eingerichtet. Der Prototyp läuft außerhalb der App Sandbox, damit er lokale Entwicklungswerkzeuge starten kann.
+Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs. Signiert wird mit der ersten „Developer ID Application“ aus dem Schlüsselbund, ersatzweise ad-hoc. Eine gleichbleibende Signatur ist wichtig, weil macOS die einmal erteilten Ordner-Berechtigungen an sie bindet. Die App läuft außerhalb der App Sandbox, damit sie lokale Entwicklungswerkzeuge starten kann.
+
+### Installierbares DMG bauen
+
+```sh
+bash scripts/build-app.sh release
+```
+
+Das erzeugt `build/DevWatch.dmg` mit dem App-Bundle und einer Verknüpfung auf `/Applications`, sodass die App im geöffneten DMG per Drag-and-drop installiert wird. Der Ablauf signiert mit Developer ID und Hardened Runtime, notarisiert erst die App und nach dem Packen das DMG bei Apple und heftet beide Tickets an („stapling“). Dadurch startet auch eine aus dem DMG gezogene Kopie ohne Gatekeeper-Dialog und ohne Internetverbindung.
+
+| Variable | Bedeutung |
+| --- | --- |
+| `SIGN_IDENTITY` | Zu verwendende Signatur, zum Beispiel `Developer ID Application: … (TEAMID)`. Ohne Angabe wird die erste passende Identität aus dem Schlüsselbund genommen. |
+| `NOTARY_PROFILE` | Name des `notarytool`-Keychain-Profils, Standard `notch`. Neu anlegen mit `xcrun notarytool store-credentials <name> --apple-id <mail> --team-id <TEAMID>`. |
+| `SKIP_NOTARIZE=1` | Nur signieren und DMG bauen, ohne Apple-Notarisierung. Für schnelle lokale Durchläufe; das Ergebnis ist nicht zur Weitergabe geeignet. |
 
 ### Erste Verwendung
 
