@@ -158,11 +158,19 @@ bash scripts/build-app.sh release
 
 Das erzeugt `build/DevWatch.dmg` mit dem App-Bundle und einer Verknüpfung auf `/Applications`, sodass die App im geöffneten DMG per Drag-and-drop installiert wird. Der Ablauf signiert mit Developer ID und Hardened Runtime, notarisiert erst die App und nach dem Packen das DMG bei Apple und heftet beide Tickets an („stapling“). Dadurch startet auch eine aus dem DMG gezogene Kopie ohne Gatekeeper-Dialog und ohne Internetverbindung.
 
-| Variable | Bedeutung |
+Die dafür nötigen Angaben stehen in `scripts/release.env`. Diese Datei ist bewusst nicht eingecheckt, weil sie auf jedem Rechner anders aussieht:
+
+```sh
+cp scripts/release.env.example scripts/release.env
+```
+
+| Einstellung | Bedeutung |
 | --- | --- |
-| `SIGN_IDENTITY` | Zu verwendende Signatur, zum Beispiel `Developer ID Application: … (TEAMID)`. Ohne Angabe wird die erste passende Identität aus dem Schlüsselbund genommen. |
-| `NOTARY_PROFILE` | Name des `notarytool`-Keychain-Profils, Standard `notch`. Neu anlegen mit `xcrun notarytool store-credentials <name> --apple-id <mail> --team-id <TEAMID>`. |
+| `NOTARY_PROFILE` | Name des `notarytool`-Keychain-Profils. Einmalig anlegen mit `xcrun notarytool store-credentials <name> --apple-id <mail> --team-id <TEAMID>`; abgefragt wird ein app-spezifisches Passwort von appleid.apple.com. Ohne diese Angabe bricht der Release-Lauf mit einem Hinweis ab, statt ein fremdes Profil zu raten. |
+| `SIGN_IDENTITY` | Zu verwendende Signatur, zum Beispiel `Developer ID Application: … (TEAMID)`. Ohne Angabe wird die erste passende Identität aus dem Schlüsselbund genommen, siehe `security find-identity -v -p codesigning`. |
 | `SKIP_NOTARIZE=1` | Nur signieren und DMG bauen, ohne Apple-Notarisierung. Für schnelle lokale Durchläufe; das Ergebnis ist nicht zur Weitergabe geeignet. |
+
+Jede dieser Einstellungen lässt sich auch als Umgebungsvariable übergeben und hat dann Vorrang vor der Datei: `SKIP_NOTARIZE=1 ./scripts/build-app.sh release`. `DEVWATCH_RELEASE_ENV` wählt eine andere Konfigurationsdatei aus. Die Datei wird gelesen, nicht ausgeführt; unbekannte Schlüssel werden mit einer Warnung übergangen.
 
 ### Erste Verwendung
 

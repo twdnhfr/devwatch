@@ -7,16 +7,53 @@
 #                                     Notarisierung, Stapling und DMG mit
 #                                     Applications-Verknüpfung zum Hineinziehen
 #
-# Umgebungsvariablen für release:
+# Einstellungen für release stehen in scripts/release.env (nicht im Repository,
+# Vorlage: scripts/release.env.example). Eine bereits gesetzte Umgebungsvariable
+# hat Vorrang vor der Datei. DEVWATCH_RELEASE_ENV wählt eine andere Datei aus.
+#
 #   SIGN_IDENTITY    "Developer ID Application: … (TEAMID)"; ohne Angabe wird die
 #                    erste passende Identität aus dem Schlüsselbund genommen
-#   NOTARY_PROFILE   notarytool-Keychain-Profil, Standard "notch". Neu anlegen mit
-#                    xcrun notarytool store-credentials <name> --apple-id <mail> --team-id <TEAMID>
+#   NOTARY_PROFILE   Name des notarytool-Keychain-Profils; ohne Angabe bricht der
+#                    Release-Lauf mit einer Anleitung ab
 #   SKIP_NOTARIZE=1  nur signieren und DMG bauen, ohne Apple-Notarisierung
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mode="${1:-app}"
+
+# Bewusst kein "source": die Datei wird gelesen, nicht ausgeführt.
+load_release_config() {
+    local file="$1" line key value
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line#"${line%%[![:space:]]*}"}"
+        case "$line" in ''|'#'*) continue ;; esac
+        line="${line#export }"
+        key="${line%%=*}"
+        if [ "$key" = "$line" ]; then
+            printf '%s: Zeile ohne "=" übersprungen: %s\n' "$file" "$line" >&2
+            continue
+        fi
+        value="${line#*=}"
+        key="${key%"${key##*[![:space:]]}"}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        case "$value" in
+            \"*\") value="${value#\"}"; value="${value%\"}" ;;
+            \'*\') value="${value#\'}"; value="${value%\'}" ;;
+        esac
+        case "$key" in
+            SIGN_IDENTITY|NOTARY_PROFILE|SKIP_NOTARIZE) ;;
+            *)
+                printf '%s: unbekannter Schlüssel %s wird ignoriert\n' "$file" "$key" >&2
+                continue
+                ;;
+        esac
+        [ -n "${!key+set}" ] || export "$key=$value"
+    done < "$file"
+}
+
+release_config="${DEVWATCH_RELEASE_ENV:-$PWD/scripts/release.env}"
+[ -f "$release_config" ] && load_release_config "$release_config"
 app_dir="$PWD/build/DevWatch.app"
 dmg_path="$PWD/build/DevWatch.dmg"
 iconset="$PWD/build/DevWatch.iconset"
@@ -61,8 +98,18 @@ if [ "$mode" = "release" ]; then
         exit 1
     fi
     version="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Support/Info.plist)"
-    profile="${NOTARY_PROFILE:-notch}"
+    profile="${NOTARY_PROFILE:-}"
     staging="$PWD/build/dmg-staging"
+
+    if [ "${SKIP_NOTARIZE:-0}" != "1" ] && [ -z "$profile" ]; then
+        printf 'Kein NOTARY_PROFILE gesetzt.\n' >&2
+        printf 'Vorlage kopieren und eintragen:\n' >&2
+        printf '  cp scripts/release.env.example scripts/release.env\n' >&2
+        printf 'Profil einmalig anlegen:\n' >&2
+        printf '  xcrun notarytool store-credentials <name> --apple-id <mail> --team-id <TEAMID>\n' >&2
+        printf 'Zum Bauen ohne Notarisierung: SKIP_NOTARIZE=1 ./scripts/build-app.sh release\n' >&2
+        exit 1
+    fi
 
     codesign --force --options runtime --timestamp --sign "$identity" "$app_dir"
     codesign --verify --strict --verbose=2 "$app_dir"
