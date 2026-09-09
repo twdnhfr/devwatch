@@ -115,6 +115,17 @@ struct ProjectsView: View {
                 Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
             }
             Divider()
+            HStack(spacing: 8) {
+                Text("DevWatch \(AppModel.bundleVersion)").font(.callout)
+                Spacer()
+                // Ohne Fund bleibt die Zeile stumm: eine gescheiterte Prüfung
+                // ist von "keine neue Version" nicht zu unterscheiden.
+                if let update = model.updates.available {
+                    Link("Version \(update.displayVersion) laden …", destination: update.pageURL)
+                        .font(.callout)
+                }
+            }
+            Divider()
             HStack {
                 Text("Projektordner").font(.headline)
                 Spacer()

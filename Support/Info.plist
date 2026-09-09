@@ -13,6 +13,9 @@
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <!-- Endpunkt der Update-Prüfung. Beim Fork auf das eigene Repository zeigen
+         lassen oder den Schlüssel entfernen, um die Prüfung abzuschalten. -->
+    <key>DWReleaseFeedURL</key><string>https://api.github.com/repos/twdnhfr/devwatch/releases/latest</string>
     <key>NSDesktopFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
     <key>NSDocumentsFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>
     <key>NSDownloadsFolderUsageDescription</key><string>DevWatch beobachtet die von dir freigegebenen Projektordner auf Dateiänderungen.</string>

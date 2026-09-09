@@ -6,6 +6,8 @@
 #   ./scripts/build-app.sh release    Developer-ID-Signatur mit Hardened Runtime,
 #                                     Notarisierung, Stapling und DMG mit
 #                                     Applications-Verknüpfung zum Hineinziehen
+#   ./scripts/build-app.sh publish    das fertige DMG als GitHub-Release
+#                                     veröffentlichen (setzt release voraus)
 #
 # Einstellungen für release stehen in scripts/release.env (nicht im Repository,
 # Vorlage: scripts/release.env.example). Eine bereits gesetzte Umgebungsvariable
@@ -57,6 +59,52 @@ release_config="${DEVWATCH_RELEASE_ENV:-$PWD/scripts/release.env}"
 app_dir="$PWD/build/DevWatch.app"
 dmg_path="$PWD/build/DevWatch.dmg"
 iconset="$PWD/build/DevWatch.iconset"
+version="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Support/Info.plist)"
+
+# Lädt das fertige DMG als GitHub-Release hoch. Bewusst vor dem Bauen: ein
+# Neubau würde das bereits notarisierte und gestapelte Bundle verwerfen.
+if [ "$mode" = "publish" ]; then
+    tag="v$version"
+    if ! command -v gh >/dev/null 2>&1; then
+        printf 'Das GitHub-CLI "gh" fehlt: brew install gh && gh auth login\n' >&2
+        exit 1
+    fi
+    if [ ! -f "$dmg_path" ]; then
+        printf 'Kein DMG unter %s. Erst ./scripts/build-app.sh release ausführen.\n' "$dmg_path" >&2
+        exit 1
+    fi
+    if ! xcrun stapler validate "$dmg_path" >/dev/null 2>&1; then
+        printf 'Das DMG ist nicht notarisiert und gestapelt und wird nicht veröffentlicht.\n' >&2
+        printf 'Neu bauen mit: ./scripts/build-app.sh release\n' >&2
+        exit 1
+    fi
+    if [ -n "$(git status --porcelain)" ]; then
+        printf 'Arbeitsverzeichnis ist nicht sauber; das DMG passt dann nicht zum Tag.\n' >&2
+        exit 1
+    fi
+    git fetch --quiet origin
+    upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+    if [ -z "$upstream" ] || ! git merge-base --is-ancestor HEAD "$upstream"; then
+        printf 'HEAD ist nicht gepusht. Erst "git push", dann veröffentlichen.\n' >&2
+        exit 1
+    fi
+    if gh release view "$tag" >/dev/null 2>&1; then
+        printf 'Release %s gibt es schon. Version in Support/Info.plist erhöhen.\n' "$tag" >&2
+        exit 1
+    fi
+    if [ "$(gh repo view --json visibility --jq .visibility 2>/dev/null)" = "PRIVATE" ]; then
+        printf 'HINWEIS: Das Repository ist privat — der Download braucht dann ein Token,\n' >&2
+        printf 'und die Update-Prüfung in der App bleibt wirkungslos.\n' >&2
+    fi
+    # Der Dateiname ist zugleich der Name des Assets.
+    asset="$PWD/build/DevWatch-$version.dmg"
+    cp "$dmg_path" "$asset"
+    git rev-parse -q --verify "refs/tags/$tag" >/dev/null || git tag -a "$tag" -m "DevWatch $version"
+    git push --quiet origin "$tag"
+    gh release create "$tag" "$asset" --title "DevWatch $version" --generate-notes
+    rm -f "$asset"
+    exit 0
+fi
 
 # Beide Architekturen, damit das DMG auch auf Intel-Macs läuft.
 architectures=(--arch arm64 --arch x86_64)
@@ -97,7 +145,6 @@ if [ "$mode" = "release" ]; then
         printf 'Zertifikat installieren oder SIGN_IDENTITY setzen.\n' >&2
         exit 1
     fi
-    version="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Support/Info.plist)"
     profile="${NOTARY_PROFILE:-}"
     staging="$PWD/build/dmg-staging"
 

@@ -172,6 +172,22 @@ cp scripts/release.env.example scripts/release.env
 
 Jede dieser Einstellungen lässt sich auch als Umgebungsvariable übergeben und hat dann Vorrang vor der Datei: `SKIP_NOTARIZE=1 ./scripts/build-app.sh release`. `DEVWATCH_RELEASE_ENV` wählt eine andere Konfigurationsdatei aus. Die Datei wird gelesen, nicht ausgeführt; unbekannte Schlüssel werden mit einer Warnung übergangen.
 
+### Als GitHub-Release veröffentlichen
+
+```sh
+bash scripts/build-app.sh publish
+```
+
+Das nimmt das bereits gebaute DMG, legt den Tag `v<Version>` an, schiebt ihn zu `origin` und erzeugt daraus ein GitHub-Release mit dem DMG als Asset. Der Assetname enthält die Version, die Release-Notizen entstehen aus den Commits seit dem letzten Tag.
+
+Bewusst wird dabei nichts neu gebaut: Ein Neubau würde das notarisierte und gestapelte Bundle verwerfen. Der Schritt bricht deshalb vorher ab, wenn das DMG fehlt oder kein gültiges Notarisierungsticket trägt, das Arbeitsverzeichnis nicht sauber ist, `HEAD` noch nicht gepusht wurde oder es den Tag schon gibt. Für eine neue Version wird die Nummer in `Support/Info.plist` erhöht, dann `release` und anschließend `publish` ausgeführt.
+
+### Update-Hinweis in der App
+
+Die App fragt beim Start und danach einmal täglich die in `Support/Info.plist` unter `DWReleaseFeedURL` hinterlegte GitHub-Adresse nach dem neuesten Release. Ist dessen Tag höher als die eigene Version, erscheint im Menüleisten-Menü und in den Einstellungen ein Verweis auf die Release-Seite; heruntergeladen und ersetzt wird die App weiterhin von Hand.
+
+Die Prüfung ist absichtlich stumm, wenn sie scheitert: Ohne Netz, bei erreichtem API-Limit oder solange das Repository privat ist (die API antwortet dann mit 404), passiert schlicht nichts. Deshalb wird auch kein „Version ist aktuell“ angezeigt — eine gescheiterte Prüfung wäre davon nicht zu unterscheiden. Wer das Projekt forkt, trägt seine eigene Adresse ein oder entfernt den Schlüssel, um die Prüfung abzuschalten.
+
 ### Erste Verwendung
 
 1. Über das Ordnersymbol links unten „Ordner hinzufügen …“ öffnen und beispielsweise `~/gits` wählen. Git-Repositories und Worktrees werden rekursiv gefunden. Alternativ im Menü der Ordnerverwaltung ein einzelnes Webprojekt hinzufügen.

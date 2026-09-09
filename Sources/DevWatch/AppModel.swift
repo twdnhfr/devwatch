@@ -37,12 +37,20 @@ final class AppModel: ObservableObject {
     @Published private(set) var scriptNames: [UUID: [String]] = [:]
     private let storage: ProjectStorage
     private var storageAvailable = true
+    let updates: UpdateChecker
+    private var updateSubscription: AnyCancellable?
 
     init() {
+        let feed = (Bundle.main.object(forInfoDictionaryKey: "DWReleaseFeedURL") as? String)
+            .flatMap { URL(string: $0) }
+        updates = UpdateChecker(feedURL: feed, currentVersion: AppModel.bundleVersion)
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DevWatch", isDirectory: true)
         storage = ProjectStorage(fileURL: directory.appendingPathComponent("projects.json"))
         rootStorage = RootFolderSettingsStorage(fileURL: directory.appendingPathComponent("roots.json"))
+        updateSubscription = updates.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
         do { rootSettings = try rootStorage.load() }
         catch { rootsAvailable = false; errorMessage = "Stammordner konnten nicht geladen werden: \(error.localizedDescription)" }
         do {
@@ -77,8 +85,13 @@ final class AppModel: ObservableObject {
         return list.sorted { $0.directoryPath.localizedStandardCompare($1.directoryPath) == .orderedAscending }
     }
 
+    static var bundleVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+    }
+
     func activateDiscovery() {
         guard refreshTask == nil else { return }
+        updates.start()
         rescan()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -380,6 +393,7 @@ final class AppModel: ObservableObject {
 
     func shutdown() {
         approvalPrompts = []
+        updates.stop()
         scanTask?.cancel()
         refreshTask?.cancel()
         allAutomations.forEach { $0.shutdown() }
