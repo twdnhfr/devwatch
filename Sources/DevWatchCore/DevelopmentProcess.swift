@@ -35,10 +35,15 @@ public final class DevelopmentProcess: ObservableObject {
         generation = token
         var environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        var paths = (environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin")
-            .split(separator: ":").map(String.init).filter { $0.hasPrefix("/") }
-        paths += [home + "/.bun/bin", "/opt/homebrew/bin", "/usr/local/bin",
-                  home + "/Library/Application Support/Herd/bin"]
+        // The login shell comes first so a command resolves to the same tool the
+        // user gets in their terminal, then this process's own PATH, then the
+        // well-known install directories as a fallback for an unreadable shell.
+        var paths = SearchPath.combine(
+            LoginShellPath.shared.directories(),
+            SearchPath.split(environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"),
+            [home + "/.bun/bin", "/opt/homebrew/bin", "/usr/local/bin",
+             home + "/Library/Application Support/Herd/bin"]
+        )
         // Herd's NVM installation is usable without sourcing interactive shell configuration.
         // With multiple installed versions the user must provide a PATH or absolute executable.
         let nodeRoot = URL(fileURLWithPath: home + "/Library/Application Support/Herd/config/nvm/versions/node")

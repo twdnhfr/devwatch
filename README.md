@@ -17,7 +17,7 @@ Die App ergänzt Herd. Sie verwaltet in V1 weder PHP noch Datenbanken und benöt
 - Nutzer wählen einen oder mehrere Ordner mit ihren Entwicklungsprojekten aus.
 - Projekte mit `package.json` und einem geeigneten Entwicklungsscript werden erkannt. Git-Worktrees sollen als eigenständige Arbeitsverzeichnisse berücksichtigt werden.
 - Die App schlägt anhand von Scripts, `packageManager` und Lockfiles einen Befehl vor, beispielsweise `bun run dev`, `npm run dev`, `yarn run dev` oder `pnpm run dev`. Mehrdeutige Angaben werden angezeigt und können korrigiert werden.
-- Jedes Projekt und sein Startbefehl werden einmal ausdrücklich für den Autostart freigegeben. Das bloße Entdecken eines Repositorys führt keinen Code aus.
+- Autostart ist für neu erkannte Projekte standardmäßig eingeschaltet: Beim Entdecken wird der vorgeschlagene Befehl zusammen mit dem aktuellen Stand der `package.json` als Freigabe hinterlegt. Das Entdecken selbst führt noch keinen Code aus, die erste relevante Dateiänderung danach aber schon. Wer ein fremdes Repository in einen erfassten Stammordner klont, sollte dessen `dev`- beziehungsweise `build`-Script deshalb vorher lesen oder das Projekt ausblenden. Ein ausdrücklich pausiertes Projekt bleibt pausiert, und jede Änderung an Befehl oder `package.json` macht die Freigabe ungültig.
 - Die erste relevante Dateiänderung startet den freigegebenen Befehl im jeweiligen Projektverzeichnis.
 - Änderungen werden kurz gebündelt; als Ausgangswert ist etwa eine Sekunde vorgesehen.
 - Ein bereits laufender Entwicklungsserver wird durch weitere Dateiänderungen nicht erneut gestartet. Das Nachladen übernimmt der Entwicklungsserver.
@@ -148,7 +148,7 @@ bash scripts/build-app.sh install    # zusätzlich nach /Applications kopieren u
 open build/DevWatch.app
 ```
 
-Das Script erzeugt ein Release-App-Bundle für die Architektur des lokalen Macs. Signiert wird mit der ersten „Developer ID Application“ aus dem Schlüsselbund, ersatzweise ad-hoc. Eine gleichbleibende Signatur ist wichtig, weil macOS die einmal erteilten Ordner-Berechtigungen an sie bindet. Die App läuft außerhalb der App Sandbox, damit sie lokale Entwicklungswerkzeuge starten kann.
+Das Script erzeugt ein Release-App-Bundle als Universal Binary für Apple Silicon und Intel (`--arch arm64 --arch x86_64`). Signiert wird mit der ersten „Developer ID Application“ aus dem Schlüsselbund, ersatzweise ad-hoc. Eine gleichbleibende Signatur ist wichtig, weil macOS die einmal erteilten Ordner-Berechtigungen an sie bindet. Die App läuft außerhalb der App Sandbox, damit sie lokale Entwicklungswerkzeuge starten kann.
 
 ### Installierbares DMG bauen
 
@@ -193,7 +193,7 @@ Geprüft am 8. September 2026: Debug- und Release-Build erfolgreich, 55 Tests be
 - Jede Änderung an `package.json` erfordert eine neue Freigabe, auch eine reine Formatierungsänderung. Die Prüfung erfolgt vor jedem automatischen Start und beim erneuten Beobachten nach einem App-Neustart. Veränderte Quellcodedateien benötigen keine neue Freigabe.
 - Symlink-Ziele außerhalb des Projektordners werden nicht beobachtet. Verschobene/entfernte Projektwurzeln oder verlorene Dateiereignisse pausieren die Beobachtung; anschließend muss das Projekt geprüft und erneut freigegeben werden.
 - Es gibt noch keinen automatischen Neustart, keine URL-Erkennung und keinen Bereitschaftscheck. „Prozess läuft“ bestätigt nicht die Erreichbarkeit der Website.
-- `PATH` wird um übliche Bun-, Homebrew- und Herd-Pfade ergänzt. Projektspezifische Node-Versionen, `.nvmrc` und asdf werden noch nicht ausgewertet; der Herd-NVM-Fallback greift nur bei einer installierten Version.
+- Eine aus dem Finder gestartete App erbt nur den minimalen System-`PATH`. DevWatch fragt deshalb beim Start einmalig die Login-Shell (`$SHELL -l`) nach ihrem `PATH` und stellt ihn voran; damit werden auch nvm, fnm, Volta, mise und asdf gefunden. Ergänzt werden anschließend übliche Bun-, Homebrew- und Herd-Pfade. Antwortet die Shell nicht innerhalb von drei Sekunden, wird sie beendet und nur die bekannten Pfade verwendet. Projektspezifische Node-Versionen per `.nvmrc` werden weiterhin nicht ausgewertet; der Herd-NVM-Fallback greift nur bei einer installierten Version.
 - Bereits extern gestartete Server werden weder erkannt noch übernommen. Portkonflikte erscheinen über die Ausgabe des gestarteten Werkzeugs.
 - Eigene Prozessgruppen werden beim Stoppen und regulären App-Beenden aufgeräumt. Bewusst daemonisierte Prozesse, die ihre Prozessgruppe verlassen, und ein erzwungenes Beenden der App sind nicht abgedeckt.
 
@@ -209,3 +209,7 @@ Der Inaktivitätstimer beginnt bei jedem erfolgreichen Prozessstart und läuft 3
 Projekte mit `build`-Script werden ebenfalls erkannt: `dev` hat Vorrang, andernfalls wird `run build` vorgeschlagen. Der erkannte Befehl steht direkt unter dem Projektnamen. Ein erfolgreicher Build behält die Autostart-Freigabe und wird bei der nächsten relevanten Dateiänderung erneut ausgeführt; ein fehlgeschlagener Build pausiert den Autostart. Die Vorschau berücksichtigt die zum gewählten Script gehörenden Lifecycle-Scripts.
 
 Das Menüleisten-Popup zeigt pro verwendetem Projekt eine Zeile mit Script-Labels aus `package.json`. Ein Klick startet das jeweilige Script oder stoppt dessen laufenden Prozess. Zusätzliche Scripts laufen unabhängig vom freigegebenen Standardbefehl und werden ausschließlich manuell gestartet. Ein grüner Punkt steht für einen laufenden Prozess, ein grüner Haken für Exit-Code 0, ein rotes Kreuz für einen Fehler; manuelles Stoppen bleibt neutral. Ergebnisse bleiben für die App-Sitzung sichtbar. Ob ein Script dauerhaft läuft oder einmalig endet, ergibt sich aus seinem tatsächlichen Prozesszustand, nicht aus seinem Namen. Auch zusätzliche laufende Scripts werden beim App-Beenden und mit „Alle stoppen“ beendet.
+
+## Lizenz
+
+MIT, siehe [LICENSE](LICENSE).

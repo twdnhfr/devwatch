@@ -1,4 +1,5 @@
 import AppKit
+import DevWatchCore
 import SwiftUI
 
 @main
@@ -77,6 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Keep project windows available without a Dock or Command-Tab entry.
         NSApplication.shared.setActivationPolicy(.accessory)
+        // Fill the PATH cache off the main thread; reading it starts a login
+        // shell, which would otherwise stall the first process start.
+        Task.detached(priority: .utility) { _ = LoginShellPath.shared.directories() }
         // Set the running app's icon explicitly, including after a local bundle rebuild.
         if let url = Bundle.main.url(forResource: "DevWatch", withExtension: "icns"),
            let icon = NSImage(contentsOf: url) {

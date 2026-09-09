@@ -21,8 +21,10 @@ app_dir="$PWD/build/DevWatch.app"
 dmg_path="$PWD/build/DevWatch.dmg"
 iconset="$PWD/build/DevWatch.iconset"
 
-swift build -c release
-binary_dir="$(swift build -c release --show-bin-path)"
+# Beide Architekturen, damit das DMG auch auf Intel-Macs läuft.
+architectures=(--arch arm64 --arch x86_64)
+swift build -c release "${architectures[@]}"
+binary_dir="$(swift build -c release "${architectures[@]}" --show-bin-path)"
 
 rm -rf "$app_dir" "$iconset"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources" "$iconset"
