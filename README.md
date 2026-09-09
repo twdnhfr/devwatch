@@ -1,80 +1,82 @@
 <p align="center">
-  <img src="Support/Brand/devwatch-logo.png" alt="DevWatch App-Logo" width="180" />
+  <img src="Support/Brand/devwatch-logo.png" alt="DevWatch app logo" width="180" />
 </p>
 
 # DevWatch
 
-**Du arbeitest am Projekt. Deine Entwicklungsprozesse starten automatisch.**
+**Focus on your code. Your development processes start automatically.**
 
-DevWatch ist eine kostenlose, quelloffene macOS-App für die Menüleiste. Sie beobachtet deine lokalen Webprojekte und startet bei relevanten Dateiänderungen den passenden Entwicklungsbefehl – etwa `bun run dev`. Laufende Scripts, Status und Logs behältst du direkt in der App im Blick.
+DevWatch is a free, open-source macOS menu bar app. It watches your local web projects and starts the appropriate development command, such as `bun run dev`, when relevant files change. Keep track of running scripts, process status, and logs directly in the app.
 
-Praktisch für die Arbeit mit Laravel, Vite und KI-Coding-Assistenten: Ob du selbst oder ein Agent eine Datei änderst, spielt keine Rolle. DevWatch ergänzt Werkzeuge wie Laravel Herd und funktioniert ohne Integration in einen bestimmten Editor oder Agenten.
+Built for workflows with Laravel, Vite, and AI coding assistants: it makes no difference whether you or an agent edits a file. DevWatch complements tools such as Laravel Herd without requiring an integration with a particular editor or agent.
 
-**[DevWatch 1.0.0 herunterladen](https://github.com/twdnhfr/devwatch/releases/download/v1.0.0/DevWatch-1.0.0.dmg)** · [Alle Releases](https://github.com/twdnhfr/devwatch/releases) · [Fehler melden](https://github.com/twdnhfr/devwatch/issues)
+**[Download DevWatch 1.0.0](https://github.com/twdnhfr/devwatch/releases/download/v1.0.0/DevWatch-1.0.0.dmg)** · [All releases](https://github.com/twdnhfr/devwatch/releases) · [Report an issue](https://github.com/twdnhfr/devwatch/issues)
 
-macOS 14 oder neuer · Apple Silicon und Intel · MIT-Lizenz
+macOS 14 or later · Apple Silicon and Intel · MIT license
 
 ## Installation
 
-1. Das DMG herunterladen und öffnen.
-2. **DevWatch** in den Ordner **Programme** ziehen und starten.
-3. Über das Menüleisten-Icon das Projektfenster öffnen und einen Projektordner hinzufügen.
+1. Download and open the DMG.
+2. Drag **DevWatch** into **Applications** and launch it.
+3. Open the project window from the menu bar icon and add a project folder.
 
-Die benötigten Entwicklungswerkzeuge wie Bun oder Node.js sowie die Projektabhängigkeiten müssen bereits installiert sein. DevWatch installiert sie nicht selbst.
+Development tools such as Bun or Node.js and your project dependencies must already be installed. DevWatch does not install them for you.
 
-## Funktionen
+The app interface is currently in German. The instructions below include the corresponding button labels where helpful.
 
-- **Automatischer Start bei Dateiänderungen:** Startet das erkannte `dev`-Script, alternativ `build`. Ein bereits laufender Prozess wird durch weitere Änderungen nicht doppelt gestartet.
-- **Projekte automatisch finden:** Durchsucht ausgewählte Stammordner nach Git-Repositories und Worktrees mit einem passenden `package.json`-Script. Einzelne Webprojekte lassen sich auch direkt hinzufügen.
-- **Bun, npm, Yarn und pnpm:** Erkennt den Paketmanager anhand von `packageManager` und Lockfiles. Der Programmname oder Programmpfad lässt sich anpassen.
-- **Scripts direkt in der Menüleiste:** Weitere Scripts aus `package.json`, etwa `lint` oder `test`, lassen sich unabhängig vom Standardbefehl manuell starten und stoppen.
-- **Mehrere Projekte gleichzeitig:** Kompakte Projektübersicht mit Prozessstatus, Script-Ergebnissen und Live-Logs.
-- **Automatischer Stopp nach 30 Minuten:** Ohne relevante Dateiänderung wird der Standardprozess beendet. Bei aktivem Autostart startet ihn die nächste Änderung wieder.
-- **Kontrolle pro Projekt:** Starten, stoppen, Autostart pausieren und Projekte ausblenden. Bewusste Pausen bleiben über App-Neustarts erhalten.
-- **Start beim Anmelden und Update-Hinweise:** Optional mit macOS starten und auf neue GitHub-Releases hingewiesen werden.
+## Features
 
-## Erste Schritte
+- **Start on file changes:** Automatically runs the detected `dev` script, or `build` as a fallback. Further changes do not start a second instance of an already running process.
+- **Discover projects:** Scans selected root folders for Git repositories and worktrees with a suitable `package.json` script. You can also add individual web projects directly.
+- **Bun, npm, Yarn, and pnpm:** Detects the package manager from `packageManager` and lockfiles. The executable name or path can be customized.
+- **Scripts in your menu bar:** Manually start and stop other scripts from `package.json`, such as `lint` or `test`, independently of the default command.
+- **Multiple projects at once:** A compact project overview with process status, script results, and live logs.
+- **Stop after 30 minutes of inactivity:** Stops the default process when no relevant files have changed. With autostart enabled, the next change starts it again.
+- **Per-project controls:** Start, stop, pause autostart, and hide projects. Explicit pauses persist across app restarts.
+- **Launch at login and update notices:** Optionally start with macOS and receive notifications about new GitHub releases.
 
-1. Über **„Ordner hinzufügen …“** beispielsweise `~/gits` auswählen. DevWatch findet passende Projekte rekursiv und prüft die Stammordner regelmäßig erneut.
-2. Den erkannten Befehl kontrollieren. Unter **„Details & Logs“** findest du Einstellungen und Prozessausgaben.
-3. Eine Quelldatei ändern: Bei aktivem Autostart läuft der Entwicklungsbefehl automatisch an. **„Starten“** steht auch manuell zur Verfügung.
-4. Mit **„Stoppen“** den Prozess beenden und den Autostart pausieren. Zum Fortsetzen den Autostart wieder einschalten.
+## Getting started
 
-**Autostart ist für neu erkannte, gültige Projekte standardmäßig eingeschaltet.** Das Hinzufügen allein startet noch keinen Prozess; die nächste relevante Dateiänderung führt den erkannten Befehl aus. Prüfe deshalb die Scripts fremder Repositories, bevor du sie in einen beobachteten Stammordner aufnimmst. Änderungen am Befehl oder an `package.json` erfordern eine erneute Freigabe.
+1. Use **“Ordner hinzufügen …”** (Add folder) to select a folder such as `~/gits`. DevWatch discovers suitable projects recursively and rescans root folders regularly.
+2. Check the detected command. Settings and process output are available under **“Details & Logs”**.
+3. Edit a source file: with autostart enabled, the development command starts automatically. You can also use **“Starten”** (Start) to run it manually.
+4. Use **“Stoppen”** (Stop) to end the process and pause autostart. Turn autostart back on when you want to resume.
 
-Das Schließen des Fensters lässt DevWatch in der Menüleiste weiterlaufen. Beim regulären Beenden der App werden die von ihr gestarteten Prozesse einschließlich ihrer Kindprozesse innerhalb der eigenen Prozessgruppen beendet.
+**Autostart is enabled by default for newly discovered, valid projects.** Adding a project does not immediately start a process; the next relevant file change runs the detected command. Review scripts in unfamiliar repositories before adding them to a watched root folder. Changes to the command or `package.json` require renewed approval.
 
-## Welche Änderungen zählen?
+Closing the window leaves DevWatch running in the menu bar. Quitting the app normally stops the processes it started, including child processes within their process groups.
 
-DevWatch reagiert auf Änderungen an Quellcode und Projektkonfiguration, einschließlich PHP- und Blade-Dateien. Ausgeschlossen sind unter anderem:
+## Which changes trigger a start?
 
-- Git-Metadaten und Abhängigkeiten: `.git`, `node_modules`, `vendor`
-- Laufzeitdaten und Caches: etwa `storage` und `bootstrap/cache`
-- Generierte Assets: etwa `public/build` und `dist`
-- Laufzeitmarker wie `public/hot` sowie temporäre Editor- und Systemdateien
+DevWatch responds to changes in source code and project configuration, including PHP and Blade files. Exclusions include:
 
-Die erstmalige Erfassung eines Ordners löst keinen Start aus. Ein `git pull` oder Branchwechsel kann dagegen relevante Dateien verändern und damit einen Prozess starten.
+- Git metadata and dependencies: `.git`, `node_modules`, `vendor`
+- Runtime data and caches: for example, `storage` and `bootstrap/cache`
+- Generated assets: for example, `public/build` and `dist`
+- Runtime markers such as `public/hot`, along with temporary editor and system files
 
-Der Inaktivitätstimer berücksichtigt ausschließlich relevante Dateiänderungen. Lesen im Editor oder Terminal und die Nutzung der Website im Browser verlängern die 30 Minuten nicht.
+The initial scan of a folder does not trigger a start. A `git pull` or branch switch can change relevant files and therefore start a process.
 
-## Lokale Daten und Updates
+The inactivity timer only tracks relevant file changes. Reading code in an editor or terminal, or using the website in a browser, does not extend the 30-minute period.
 
-Projektverwaltung und Dateibeobachtung arbeiten lokal und benötigen kein Konto. Projekte, Stammordner und ausgeblendete Pfade werden unter `~/Library/Application Support/DevWatch/` gespeichert. Logs bleiben im Arbeitsspeicher. Das Entfernen eines Projekts aus der App löscht keine Projektdateien.
+## Local data and updates
 
-Für Update-Hinweise fragt DevWatch beim Start und anschließend einmal täglich die GitHub-API nach dem neuesten Release. Der Hinweis öffnet die Release-Seite; Download und Installation erfolgen manuell. Eine fehlgeschlagene Prüfung bleibt ohne Fehlermeldung. Die gestarteten Projektscripts können unabhängig davon eigene Netzwerkverbindungen aufbauen.
+Project management and file watching run locally and require no account. Projects, root folders, and hidden paths are stored in `~/Library/Application Support/DevWatch/`. Logs stay in memory. Removing a project from the app does not delete its files.
 
-## Bekannte Grenzen
+For update notices, DevWatch checks the GitHub API for the latest release at launch and once a day thereafter. The notice opens the release page; downloads and installation are manual. Failed checks do not display an error. Project scripts launched by DevWatch may make their own network connections independently.
 
-- Der automatische Standardbefehl ist `run dev` oder alternativ `run build`. Weitere Scripts werden manuell gestartet. Ein erfolgreicher Build bleibt für die nächste Änderung freigegeben; ein Fehler pausiert den Autostart.
-- „Prozess läuft“ bestätigt keine erreichbare Website. Es gibt keinen Bereitschaftscheck und keine automatische URL-Erkennung.
-- Bereits außerhalb von DevWatch gestartete Server werden weder erkannt noch übernommen. Portkonflikte erscheinen in der Ausgabe des gestarteten Werkzeugs.
-- DevWatch ergänzt den Suchpfad um die Login-Shell und übliche Werkzeugpfade. Projektspezifische Node-Versionen über `.nvmrc` werden nicht automatisch ausgewählt. Bei Bedarf lässt sich ein absoluter Programmpfad hinterlegen.
-- Symlink-Unterverzeichnisse werden bei der Projektsuche übersprungen; Ziele außerhalb des Projektordners werden nicht beobachtet. Verschobene oder entfernte Projektwurzeln und verlorene Dateiereignisse erfordern eine erneute Prüfung und Freigabe.
-- Bewusst daemonisierte Prozesse, die ihre Prozessgruppe verlassen, sowie ein erzwungenes Beenden von DevWatch sind vom regulären Aufräumen der Prozesse nicht abgedeckt.
+## Known limitations
 
-## Entwicklung
+- The automatic default command is `run dev`, or `run build` as a fallback. Other scripts are started manually. A successful build remains approved for the next change; a failure pauses autostart.
+- A running process does not confirm that a website is reachable. There is no readiness check or automatic URL detection.
+- Servers started outside DevWatch are neither detected nor taken over. Port conflicts appear in the tool's output.
+- DevWatch supplements its executable search path with the login shell's path and common tool locations. Project-specific Node versions specified in `.nvmrc` are not selected automatically. You can set an absolute executable path if needed.
+- Symlinked subdirectories are skipped during project discovery; targets outside the project folder are not watched. Moved or removed project roots and lost file events require review and renewed approval.
+- Normal process cleanup does not cover deliberately daemonized processes that leave their process group, or force-quitting DevWatch.
 
-DevWatch nutzt Swift, SwiftUI und FSEvents. Das Projekt verwendet Swift Package Manager ohne externe Paketabhängigkeiten. Benötigt werden macOS 14 oder neuer und eine Swift-6-Toolchain; kompiliert wird im Swift-5-Sprachmodus.
+## Development
+
+DevWatch uses Swift, SwiftUI, and FSEvents. The project uses Swift Package Manager with no external package dependencies. Building requires macOS 14 or later and a Swift 6 toolchain; sources compile in Swift 5 language mode.
 
 ```sh
 git clone https://github.com/twdnhfr/devwatch.git
@@ -83,14 +85,14 @@ swift run DevWatch
 swift test
 ```
 
-Alternativ `Package.swift` in Xcode öffnen. App-Bundle, DMG, Signierung, Notarisierung und Veröffentlichung sind in der **[Build- und Release-Anleitung](docs/RELEASE.md)** beschrieben.
+Alternatively, open `Package.swift` in Xcode. See the **[build and release guide](docs/RELEASE.md)** for app bundles, DMGs, signing, notarization, and publishing.
 
-Bei einem Fork kann `DWReleaseFeedURL` in `Support/Info.plist` auf das eigene Repository zeigen oder entfernt werden, um die Update-Prüfung abzuschalten.
+For forks, point `DWReleaseFeedURL` in `Support/Info.plist` to your own repository, or remove the key to disable update checks.
 
-## Mitmachen
+## Contributing
 
-Fehlerberichte und Verbesserungsvorschläge sind über [GitHub Issues](https://github.com/twdnhfr/devwatch/issues) willkommen, ebenso Pull Requests. Bei Fehlern helfen die macOS-Version, der verwendete Paketmanager, Schritte zum Nachstellen und relevante Logauszüge ohne vertrauliche Daten.
+Bug reports and suggestions are welcome through [GitHub Issues](https://github.com/twdnhfr/devwatch/issues), as are pull requests. When reporting a bug, include your macOS version, package manager, steps to reproduce, and relevant log excerpts without confidential information.
 
-## Lizenz
+## License
 
-DevWatch ist Open Source unter der [MIT-Lizenz](LICENSE).
+DevWatch is open source under the [MIT license](LICENSE).

@@ -1,48 +1,47 @@
-# DevWatch bauen und veröffentlichen
+# Building and releasing DevWatch
 
-Die folgenden Befehle werden im Repository-Verzeichnis ausgeführt. Zum Bauen werden macOS und eine Swift-6-Toolchain benötigt.
+Run the following commands from the repository directory. Building requires macOS and a Swift 6 toolchain.
 
-### Als Mac-App bauen
+## Build a Mac app
 
 ```sh
-bash scripts/build-app.sh            # App-Bundle nach build/DevWatch.app
-bash scripts/build-app.sh install    # zusätzlich nach /Applications kopieren und starten
+bash scripts/build-app.sh            # Build the app bundle at build/DevWatch.app
+bash scripts/build-app.sh install    # Also copy it to /Applications and launch it
 open build/DevWatch.app
 ```
 
-Das Script erzeugt ein Release-App-Bundle als Universal Binary für Apple Silicon und Intel (`--arch arm64 --arch x86_64`). Signiert wird mit der ersten „Developer ID Application“ aus dem Schlüsselbund, ersatzweise ad-hoc. Eine gleichbleibende Signatur ist wichtig, weil macOS die einmal erteilten Ordner-Berechtigungen an sie bindet. Die App läuft außerhalb der App Sandbox, damit sie lokale Entwicklungswerkzeuge starten kann.
+The script creates a release app bundle as a universal binary for Apple Silicon and Intel (`--arch arm64 --arch x86_64`). It signs the app using the first “Developer ID Application” identity in the keychain, falling back to ad hoc signing. A consistent signing identity matters because macOS associates folder permissions with it. The app runs outside the App Sandbox so it can launch local development tools.
 
-### Installierbares DMG bauen
+## Build an installable DMG
 
 ```sh
 bash scripts/build-app.sh release
 ```
 
-Das erzeugt `build/DevWatch.dmg` mit dem App-Bundle und einer Verknüpfung auf `/Applications`, sodass die App im geöffneten DMG per Drag-and-drop installiert wird. Der Ablauf signiert mit Developer ID und Hardened Runtime, notarisiert erst die App und nach dem Packen das DMG bei Apple und heftet beide Tickets an („stapling“). Die angehefteten Tickets ermöglichen macOS die Prüfung der Notarisierung auch ohne Internetverbindung.
+This creates `build/DevWatch.dmg` containing the app bundle and a shortcut to `/Applications` for drag-and-drop installation. The workflow signs with Developer ID and Hardened Runtime, submits the app and then the packaged DMG to Apple for notarization, and staples both tickets. Stapled tickets allow macOS to verify notarization without an internet connection.
 
-Die dafür nötigen Angaben stehen in `scripts/release.env`. Diese Datei ist bewusst nicht eingecheckt, weil sie auf jedem Rechner anders aussieht:
+Configure your local release settings in `scripts/release.env`. This file is intentionally excluded from version control because its settings are specific to each machine:
 
 ```sh
 cp scripts/release.env.example scripts/release.env
 ```
 
-| Einstellung | Bedeutung |
+| Setting | Description |
 | --- | --- |
-| `NOTARY_PROFILE` | Name des `notarytool`-Keychain-Profils. Einmalig anlegen mit `xcrun notarytool store-credentials <name> --apple-id <mail> --team-id <TEAMID>`; abgefragt wird ein app-spezifisches Passwort von appleid.apple.com. Ohne diese Angabe bricht der Release-Lauf mit einem Hinweis ab, statt ein fremdes Profil zu raten. |
-| `SIGN_IDENTITY` | Zu verwendende Signatur, zum Beispiel `Developer ID Application: … (TEAMID)`. Ohne Angabe wird die erste passende Identität aus dem Schlüsselbund genommen, siehe `security find-identity -v -p codesigning`. |
-| `SKIP_NOTARIZE=1` | Nur signieren und DMG bauen, ohne Apple-Notarisierung. Für schnelle lokale Durchläufe; das Ergebnis ist nicht zur Weitergabe geeignet. |
+| `NOTARY_PROFILE` | Name of the `notarytool` keychain profile. Create it once with `xcrun notarytool store-credentials <name> --apple-id <email> --team-id <TEAMID>`; the command prompts for an app-specific Apple password. If this setting is missing, the release workflow stops with an explanation rather than guessing a profile. |
+| `SIGN_IDENTITY` | Signing identity to use, such as `Developer ID Application: … (TEAMID)`. If omitted, the first matching identity in the keychain is used. List identities with `security find-identity -v -p codesigning`. |
+| `SKIP_NOTARIZE=1` | Sign and build the DMG without Apple notarization. Intended for quick local runs; the result is not suitable for distribution. |
 
-Jede dieser Einstellungen lässt sich auch als Umgebungsvariable übergeben und hat dann Vorrang vor der Datei: `SKIP_NOTARIZE=1 ./scripts/build-app.sh release`. `DEVWATCH_RELEASE_ENV` wählt eine andere Konfigurationsdatei aus. Die Datei wird gelesen, nicht ausgeführt; unbekannte Schlüssel werden mit einer Warnung übergangen.
+Each setting can also be supplied as an environment variable, which takes precedence over the file: `SKIP_NOTARIZE=1 ./scripts/build-app.sh release`. Use `DEVWATCH_RELEASE_ENV` to select a different configuration file. The file is parsed, not executed; unknown keys are skipped with a warning.
 
-### Als GitHub-Release veröffentlichen
+## Publish a GitHub release
 
 ```sh
 bash scripts/build-app.sh publish
 ```
 
-Das nimmt das bereits gebaute DMG, legt den Tag `v<Version>` an, schiebt ihn zu `origin` und erzeugt daraus ein GitHub-Release mit dem DMG als Asset. Der Assetname enthält die Version, die Release-Notizen entstehen aus den Commits seit dem letzten Tag.
+This uses the existing DMG, creates the tag `v<Version>`, pushes it to `origin`, and creates a GitHub release with the DMG attached. The asset name includes the version, and release notes are generated from commits since the previous tag.
 
-Bewusst wird dabei nichts neu gebaut: Ein Neubau würde das notarisierte und gestapelte Bundle verwerfen. Der Schritt bricht deshalb vorher ab, wenn das DMG fehlt oder kein gültiges Notarisierungsticket trägt, das Arbeitsverzeichnis nicht sauber ist, `HEAD` noch nicht gepusht wurde oder es den Tag schon gibt. Für eine neue Version wird die Nummer in `Support/Info.plist` erhöht, dann `release` und anschließend `publish` ausgeführt.
+The publish step deliberately does not rebuild the app, which would discard the notarized and stapled bundle. It stops if the DMG is missing or lacks a valid notarization ticket, the working tree is not clean, `HEAD` has not been pushed, or the tag already exists. For a new version, update the version number in `Support/Info.plist`, then run `release` followed by `publish`.
 
-
-[Zurück zur README](../README.md)
+[Back to the README](../README.md)
