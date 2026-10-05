@@ -10,7 +10,7 @@ DevWatch is a free, open-source macOS menu bar app. It watches your local web pr
 
 Built for workflows with Laravel, Vite, and AI coding assistants: it makes no difference whether you or an agent edits a file. DevWatch complements tools such as Laravel Herd without requiring an integration with a particular editor or agent.
 
-**[Download DevWatch 1.0.1](https://github.com/twdnhfr/devwatch/releases/download/v1.0.1/DevWatch-1.0.1.dmg)** · [All releases](https://github.com/twdnhfr/devwatch/releases) · [Report an issue](https://github.com/twdnhfr/devwatch/issues)
+**[Download DevWatch 1.1.0](https://github.com/twdnhfr/devwatch/releases/download/v1.1.0/DevWatch-1.1.0.dmg)** · [All releases](https://github.com/twdnhfr/devwatch/releases) · [Report an issue](https://github.com/twdnhfr/devwatch/issues)
 
 macOS 14 or later · Apple Silicon and Intel · MIT license
 
