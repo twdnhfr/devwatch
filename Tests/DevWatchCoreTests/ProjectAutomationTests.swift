@@ -8,7 +8,7 @@ final class ProjectAutomationTests: XCTestCase {
         let directory: URL
         let automation: ProjectAutomation
 
-        init(executable: String = "/bin/sh") throws {
+        init(executable: String = "/bin/sh", external: ExternalProcess? = nil) throws {
             directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("DevWatchAutomationTests-\(UUID().uuidString)", isDirectory: true)
                 .resolvingSymlinksInPath()
@@ -22,7 +22,7 @@ final class ProjectAutomationTests: XCTestCase {
             let storage = SavedProjects()
             automation = ProjectAutomation(project: project, onApprovalNeeded: { project, paths in
                 storage.approvalRequests.append((project, paths))
-            }) { value in
+            }, findExternalProcess: { _ in external }) { value in
                 storage.values.append(value)
                 return true
             }
@@ -60,8 +60,9 @@ final class ProjectAutomationTests: XCTestCase {
     }
 
     @MainActor
-    private func withFixture(executable: String = "/bin/sh", body: (Fixture) async throws -> Void) async throws {
-        let fixture = try Fixture(executable: executable)
+    private func withFixture(executable: String = "/bin/sh", external: ExternalProcess? = nil,
+                             body: (Fixture) async throws -> Void) async throws {
+        let fixture = try Fixture(executable: executable, external: external)
         do {
             try await body(fixture)
         } catch {
@@ -175,6 +176,20 @@ final class ProjectAutomationTests: XCTestCase {
             try await Task.sleep(nanoseconds: 1_600_000_000)
             XCTAssertTrue(fixture.automation.process.isRunning)
             XCTAssertEqual(fixture.launchCount, 1)
+        }
+    }
+
+    @MainActor
+    func testServerRunningOutsideDevWatchSkipsAutostartWithoutPausing() async throws {
+        try await withFixture(external: ExternalProcess(pid: 4242, arguments: ["bun", "run", "dev"])) { fixture in
+            try fixture.enable()
+            try fixture.change()
+            let reported = try await eventually { fixture.automation.status.contains("4242") }
+            XCTAssertTrue(reported)
+            XCTAssertFalse(fixture.automation.process.isRunning)
+            XCTAssertEqual(fixture.launchCount, 0)
+            XCTAssertTrue(fixture.automation.project.autostartEnabled, "A foreign server must not pause autostart")
+            XCTAssertFalse(fixture.automation.needsAttention)
         }
     }
 

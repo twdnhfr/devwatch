@@ -21,16 +21,19 @@ public final class ProjectAutomation: ObservableObject {
     private var hasRequestedApproval = false
     private let onApprovalNeeded: ((DevProject, [String]) -> Void)?
     private let persist: (DevProject) -> Bool
+    private let findExternalProcess: (DevProject) -> ExternalProcess?
     public var excludedDirectories: [String] = []
 
     public init(project: DevProject,
                 inactivityTimeout: TimeInterval = 30 * 60,
                 onApprovalNeeded: ((DevProject, [String]) -> Void)? = nil,
+                findExternalProcess: @escaping (DevProject) -> ExternalProcess? = { ExternalProcessDetector.find(project: $0) },
                 persist: @escaping (DevProject) -> Bool) {
         self.project = project
         self.inactivityTimeout = inactivityTimeout.isFinite && inactivityTimeout > 0 ? inactivityTimeout : 30 * 60
         self.onApprovalNeeded = onApprovalNeeded
         self.persist = persist
+        self.findExternalProcess = findExternalProcess
         subscription = process.$isRunning.dropFirst().sink { [weak self] running in
             // Published values arrive before the property's mutation has completed.
             Task { @MainActor [weak self] in
@@ -159,6 +162,15 @@ public final class ProjectAutomation: ObservableObject {
             return
         }
         guard !process.isRunning else { return }
+        autostart()
+    }
+
+    /// A server started elsewhere would make this start fail and pause autostart; wait for it instead.
+    private func autostart() {
+        if let external = findExternalProcess(project) {
+            status = L10n.text("Already running outside DevWatch (PID %@) — not started", String(describing: external.pid))
+            return
+        }
         launch()
     }
 
@@ -218,7 +230,7 @@ public final class ProjectAutomation: ObservableObject {
             } else if watcher == nil {
                 beginObserving()
             }
-            if restart { launch() }
+            if restart { autostart() }
             else { status = L10n.text("Stopped after inactivity") }
         } else if project.arguments == ["run", "build"], process.errorMessage == nil, project.autostartEnabled {
             status = L10n.text("Build completed — waiting for a file change")

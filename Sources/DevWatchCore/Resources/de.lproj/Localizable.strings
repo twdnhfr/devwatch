@@ -11,6 +11,7 @@
 "Automatic stop at %@ — after 30 minutes without file changes." = "Automatischer Stopp um %@ – nach 30 Minuten ohne Dateiänderung.";
 "Autostart" = "Autostart";
 "Autostart enabled — waiting for a file change" = "Autostart aktiv – wartet auf Dateiänderung";
+"Already running outside DevWatch (PID %@) — not started" = "Läuft bereits außerhalb von DevWatch (PID %@) – nicht gestartet";
 "Autostart not approved" = "Autostart nicht freigegeben";
 "Autostart paused" = "Autostart pausiert";
 "Autostart requires an executable name or absolute path with the arguments run dev or run build." = "Autostart benötigt einen Programmnamen oder absoluten Programmpfad mit den Argumenten run dev oder run build.";

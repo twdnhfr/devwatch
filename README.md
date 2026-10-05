@@ -69,7 +69,7 @@ For update notices, DevWatch checks the GitHub API for the latest release at lau
 
 - The automatic default command is `run dev`, or `run build` as a fallback. Other scripts are started manually. A successful build remains approved for the next change; a failure pauses autostart.
 - A running process does not confirm that a website is reachable. There is no readiness check or automatic URL detection.
-- Servers started outside DevWatch are neither detected nor taken over. Port conflicts appear in the tool's output.
+- Before an automatic start, DevWatch looks for a process of your user that runs the same script, or the tool it calls such as `vite`, in the project folder. If it finds one, it does not start a second instance and shows its PID. Such servers are never taken over or stopped. Servers started in a subfolder or under a different command are not detected, and their port conflicts appear in the tool's output.
 - DevWatch supplements its executable search path with the login shell's path and common tool locations. Project-specific Node versions specified in `.nvmrc` are not selected automatically. You can set an absolute executable path if needed.
 - Symlinked subdirectories are skipped during project discovery; targets outside the project folder are not watched. Moved or removed project roots require review and renewed approval.
 - Normal process cleanup does not cover deliberately daemonized processes that leave their process group, or force-quitting DevWatch.
