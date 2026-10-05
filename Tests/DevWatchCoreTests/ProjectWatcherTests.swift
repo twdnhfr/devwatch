@@ -51,6 +51,22 @@ final class ProjectWatcherTests: XCTestCase {
     }
 
     @MainActor
+    func testContinuousWritesStillDeliverWithinMaximumDelay() async throws {
+        let root = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var callbacks: [[String]] = []
+        let watcher = ProjectWatcher(directory: root, onChange: { callbacks.append($0) }, onError: { XCTFail($0) })
+        try watcher.start()
+        defer { watcher.stop() }
+        for _ in 0..<15 {
+            try write("app.php", in: root)
+            try await pause(0.4)
+        }
+        XCTAssertFalse(callbacks.isEmpty, "A file rewritten every 0.4 s must not starve the debounce")
+        XCTAssertEqual(callbacks.first, ["app.php"])
+    }
+
+    @MainActor
     func testStopCancelsPendingDebounceAndRestartHasNoReplay() async throws {
         let root = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }

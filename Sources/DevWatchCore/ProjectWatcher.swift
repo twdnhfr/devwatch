@@ -11,6 +11,7 @@ public final class ProjectWatcher {
     private var stream: FSEventStreamRef?
     private var pendingPaths = Set<String>()
     private var delivery: DispatchWorkItem?
+    private var burstStart: DispatchTime?
     private var generation = UUID()
     private var startedAt: TimeInterval = 0
 
@@ -78,6 +79,7 @@ public final class ProjectWatcher {
         generation = UUID()
         delivery?.cancel()
         delivery = nil
+        burstStart = nil
         pendingPaths.removeAll()
         if let stream {
             FSEventStreamStop(stream)
@@ -130,6 +132,10 @@ public final class ProjectWatcher {
         }
         guard hasRelevantEvent else { return }
         delivery?.cancel()
+        // Debounce bursts, but a file rewritten more often than once a second must not
+        // postpone delivery indefinitely.
+        let start = burstStart ?? .now()
+        burstStart = start
         let token = UUID()
         generation = token
         let work = DispatchWorkItem { [weak self] in
@@ -137,10 +143,11 @@ public final class ProjectWatcher {
             let paths = self.pendingPaths.sorted()
             self.pendingPaths.removeAll()
             self.delivery = nil
+            self.burstStart = nil
             self.onChange(paths)
         }
         delivery = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: min(.now() + 1, start + 3), execute: work)
     }
 
     private func fail(_ message: String) {
