@@ -1,3 +1,4 @@
+import CoreServices
 import Foundation
 import XCTest
 @testable import DevWatchCore
@@ -64,6 +65,27 @@ final class ProjectWatcherTests: XCTestCase {
         }
         XCTAssertFalse(callbacks.isEmpty, "A file rewritten every 0.4 s must not starve the debounce")
         XCTAssertEqual(callbacks.first, ["app.php"])
+    }
+
+    @MainActor
+    func testDroppedEventsReportChangeInsteadOfPausing() async throws {
+        let root = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var callbacks: [[String]] = []
+        let watcher = ProjectWatcher(directory: root, onChange: { callbacks.append($0) }, onError: { XCTFail($0) })
+        try watcher.start()
+        defer { watcher.stop() }
+        let physical = realpath(root.path, nil)!
+        defer { free(physical) }
+        let path = String(cString: physical)
+        watcher.handle(paths: [path + "/vendor/laravel"],
+                       flags: [FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs)])
+        try await pause(1.5)
+        XCTAssertTrue(callbacks.isEmpty, "Drops inside excluded folders must be ignored")
+        watcher.handle(paths: [path], flags: [FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs |
+            kFSEventStreamEventFlagUserDropped)])
+        try await pause(1.5)
+        XCTAssertEqual(callbacks, [["."]])
     }
 
     @MainActor

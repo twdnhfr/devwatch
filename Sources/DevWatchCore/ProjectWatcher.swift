@@ -100,20 +100,34 @@ public final class ProjectWatcher {
 
     private func receive(source: ConstFSEventStreamRef, paths: [String], flags: [FSEventStreamEventFlags]) {
         guard let stream, source == stream else { return }
-        let invalid = FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs |
-            kFSEventStreamEventFlagUserDropped | kFSEventStreamEventFlagKernelDropped |
-            kFSEventStreamEventFlagEventIdsWrapped | kFSEventStreamEventFlagRootChanged |
+        handle(paths: paths, flags: flags)
+    }
+
+    func handle(paths: [String], flags: [FSEventStreamEventFlags]) {
+        let rootLost = FSEventStreamEventFlags(kFSEventStreamEventFlagRootChanged |
             kFSEventStreamEventFlagUnmount)
-        if flags.contains(where: { $0 & invalid != 0 }) {
-            fail(L10n.text("File watching paused: the project folder was moved or file changes could not be fully captured. Review the project and enable it again."))
+        if flags.contains(where: { $0 & rootLost != 0 }) {
+            fail(L10n.text("File watching paused: the project folder was moved or unmounted. Review the project and enable it again."))
             return
         }
         let prefix = watchedPath + "/"
         let changes = FSEventStreamEventFlags(kFSEventStreamEventFlagItemCreated |
             kFSEventStreamEventFlagItemRemoved | kFSEventStreamEventFlagItemRenamed |
             kFSEventStreamEventFlagItemModified)
+        // Bulk writes such as composer update can overflow the event queue. The affected
+        // subtree is then unknown, so report it as changed; any start still rechecks approval.
+        let dropped = FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs |
+            kFSEventStreamEventFlagUserDropped | kFSEventStreamEventFlagKernelDropped |
+            kFSEventStreamEventFlagEventIdsWrapped)
         var hasRelevantEvent = false
         for (path, eventFlags) in zip(paths, flags) {
+            if eventFlags & dropped != 0 {
+                let relative = path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : ""
+                guard relative.isEmpty || !Self.isExcluded(relative) else { continue }
+                pendingPaths.insert(relative.isEmpty ? "." : relative)
+                hasRelevantEvent = true
+                continue
+            }
             guard path.hasPrefix(prefix), eventFlags & changes != 0 else { continue }
             let relative = String(path.dropFirst(prefix.count))
             guard !Self.isExcluded(relative) else { continue }

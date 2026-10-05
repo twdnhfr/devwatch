@@ -38,7 +38,7 @@
 "Executable or path" = "Executable or path";
 "Failed" = "Failed";
 "File watching failed: %@" = "File watching failed: %@";
-"File watching paused: the project folder was moved or file changes could not be fully captured. Review the project and enable it again." = "File watching paused: the project folder was moved or file changes could not be fully captured. Review the project and enable it again.";
+"File watching paused: the project folder was moved or unmounted. Review the project and enable it again." = "File watching paused: the project folder was moved or unmounted. Review the project and enable it again.";
 "Git projects inside these folders are discovered automatically." = "Git projects inside these folders are discovered automatically.";
 "Git repositories and worktrees are scanned recursively. No development processes will be started." = "Git repositories and worktrees are scanned recursively. No development processes will be started.";
 "Hide" = "Hide";

@@ -55,7 +55,7 @@ DevWatch responds to changes in source code and project configuration, including
 - Generated assets: for example, `public/build` and `dist`
 - Runtime markers such as `public/hot`, along with temporary editor and system files
 
-The initial scan of a folder does not trigger a start. A `git pull` or branch switch can change relevant files and therefore start a process.
+The initial scan of a folder does not trigger a start. A `git pull` or branch switch can change relevant files and therefore start a process. If macOS drops file events during large bulk changes, such as `composer update`, DevWatch treats the affected folder as changed.
 
 The inactivity timer only tracks relevant file changes. Reading code in an editor or terminal, or using the website in a browser, does not extend the 30-minute period.
 
@@ -71,7 +71,7 @@ For update notices, DevWatch checks the GitHub API for the latest release at lau
 - A running process does not confirm that a website is reachable. There is no readiness check or automatic URL detection.
 - Servers started outside DevWatch are neither detected nor taken over. Port conflicts appear in the tool's output.
 - DevWatch supplements its executable search path with the login shell's path and common tool locations. Project-specific Node versions specified in `.nvmrc` are not selected automatically. You can set an absolute executable path if needed.
-- Symlinked subdirectories are skipped during project discovery; targets outside the project folder are not watched. Moved or removed project roots and lost file events require review and renewed approval.
+- Symlinked subdirectories are skipped during project discovery; targets outside the project folder are not watched. Moved or removed project roots require review and renewed approval.
 - Normal process cleanup does not cover deliberately daemonized processes that leave their process group, or force-quitting DevWatch.
 
 ## Development
