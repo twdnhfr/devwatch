@@ -37,18 +37,25 @@ final class AppModel: ObservableObject {
     @Published private(set) var scriptNames: [UUID: [String]] = [:]
     private let storage: ProjectStorage
     private var storageAvailable = true
-    let updates: UpdateChecker
+    let updater: AppUpdater
     private var updateSubscription: AnyCancellable?
+    /// Checks daily and installs a prepared update when DevWatch quits.
+    @Published var automaticUpdates: Bool {
+        didSet {
+            UserDefaults.standard.set(automaticUpdates, forKey: "automaticUpdates")
+            if automaticUpdates { updater.startAutomaticChecks() } else { updater.stopAutomaticChecks() }
+        }
+    }
 
     init() {
-        let feed = (Bundle.main.object(forInfoDictionaryKey: "DWReleaseFeedURL") as? String)
-            .flatMap { URL(string: $0) }
-        updates = UpdateChecker(feedURL: feed, currentVersion: AppModel.bundleVersion)
+        updater = AppModel.makeUpdater()
+        UserDefaults.standard.register(defaults: ["automaticUpdates": true])
+        automaticUpdates = UserDefaults.standard.bool(forKey: "automaticUpdates")
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DevWatch", isDirectory: true)
         storage = ProjectStorage(fileURL: directory.appendingPathComponent("projects.json"))
         rootStorage = RootFolderSettingsStorage(fileURL: directory.appendingPathComponent("roots.json"))
-        updateSubscription = updates.objectWillChange.sink { [weak self] _ in
+        updateSubscription = updater.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
         do { rootSettings = try rootStorage.load() }
@@ -91,7 +98,7 @@ final class AppModel: ObservableObject {
 
     func activateDiscovery() {
         guard refreshTask == nil else { return }
-        updates.start()
+        if automaticUpdates { updater.startAutomaticChecks() }
         rescan()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -100,6 +107,53 @@ final class AppModel: ObservableObject {
                 self?.rescan()
             }
         }
+    }
+
+    private static func makeUpdater() -> AppUpdater {
+        let bundle = Bundle.main
+        // Forks point DWReleaseFeedURL to their own repository or remove it to disable updates.
+        let feed = (bundle.object(forInfoDictionaryKey: "DWReleaseFeedURL") as? String).flatMap { URL(string: $0) }
+        var reason: String?
+        var installer: UpdateInstaller?
+        if bundle.bundleURL.pathExtension != "app" || bundle.bundleURL.path.contains("/AppTranslocation/") {
+            reason = UpdateError.notWritable.localizedDescription
+        } else if let teamID = UpdateInstaller.currentTeamID(), let bundleID = bundle.bundleIdentifier {
+            installer = UpdateInstaller(bundleID: bundleID, teamID: teamID,
+                                        workDirectory: FileManager.default.temporaryDirectory
+                                            .appendingPathComponent("\(bundleID)-update", isDirectory: true))
+        }
+        return AppUpdater(currentVersion: bundleVersion, appURL: bundle.bundleURL, installer: installer,
+                          unavailableReason: reason, feedURL: feed)
+    }
+
+    func checkForUpdates() { Task { await updater.checkNow() } }
+
+    /// Running development processes stop with the restart; the next file change starts them again.
+    func installUpdateAndRestart() {
+        guard case .ready(let version) = updater.state else { return }
+        if runningCount > 0 {
+            let alert = NSAlert()
+            alert.messageText = L10n.text("Install DevWatch %@ now?", version)
+            alert.informativeText = L10n.text("Restarting stops all running development processes. With autostart enabled, the next file change starts them again.")
+            alert.addButton(withTitle: L10n.text("Install and Restart"))
+            alert.addButton(withTitle: L10n.text("Cancel"))
+            NSApp.activate(ignoringOtherApps: true)
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        guard updater.installPrepared() else {
+            if case .failed(let message) = updater.state {
+                errorMessage = message
+                openProjectsWindow?()
+            }
+            return
+        }
+        updater.relaunchAfterExit()
+        NSApp.terminate(nil)
+    }
+
+    /// Called while quitting; a prepared update replaces the app on disk for the next launch.
+    func installPreparedUpdateOnQuit() {
+        if automaticUpdates { updater.installPrepared() }
     }
 
     func addRootFolder() {
@@ -393,7 +447,7 @@ final class AppModel: ObservableObject {
 
     func shutdown() {
         approvalPrompts = []
-        updates.stop()
+        updater.stopAutomaticChecks()
         scanTask?.cancel()
         refreshTask?.cancel()
         allAutomations.forEach { $0.shutdown() }

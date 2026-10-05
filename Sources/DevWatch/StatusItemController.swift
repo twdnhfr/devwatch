@@ -73,8 +73,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             item.target = self
             menu.addItem(item)
         }
-        if let update = model.updates.available {
-            add(L10n.text("Download version %@ …", String(describing: update.displayVersion)), #selector(openUpdate))
+        if case .ready(let version) = model.updater.state {
+            add(L10n.text("DevWatch %@ is ready · Install and Restart", version), #selector(installUpdate))
             menu.addItem(.separator())
         }
         add(L10n.text("Projects …"), #selector(openProjects))
@@ -94,10 +94,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         model.showFolders = true
     }
     @objc private func stopAll() { model.stopAll() }
-    @objc private func openUpdate() {
-        guard let url = model.updates.available?.pageURL else { return }
-        NSWorkspace.shared.open(url)
-    }
+    @objc private func installUpdate() { model.installUpdateAndRestart() }
     @objc private func quit() { NSApp.terminate(nil) }
 
     private func togglePopover() {

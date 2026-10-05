@@ -109,5 +109,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        model?.installPreparedUpdateOnQuit()
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }

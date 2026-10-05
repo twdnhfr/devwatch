@@ -115,16 +115,7 @@ struct ProjectsView: View {
                 Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
             }
             Divider()
-            HStack(spacing: 8) {
-                Text("DevWatch \(AppModel.bundleVersion)").font(.callout)
-                Spacer()
-                // Ohne Fund bleibt die Zeile stumm: eine gescheiterte Prüfung
-                // ist von "keine neue Version" nicht zu unterscheiden.
-                if let update = model.updates.available {
-                    Link(L10n.text("Download version %@ …", String(describing: update.displayVersion)), destination: update.pageURL)
-                        .font(.callout)
-                }
-            }
+            UpdateSettings(model: model, updater: model.updater)
             Divider()
             HStack {
                 Text(L10n.text("Project folders")).font(.headline)
@@ -313,5 +304,54 @@ private struct ProjectDetail: View {
         updated.executable = trimmed
         model.update(updated)
         executable = trimmed
+    }
+}
+
+/// Observes the updater directly so download progress refreshes the row.
+private struct UpdateSettings: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var updater: AppUpdater
+
+    var body: some View {
+        Toggle(L10n.text("Install updates automatically"), isOn: $model.automaticUpdates)
+            .disabled(updater.installer == nil)
+        HStack(spacing: 8) {
+            Text(status).font(.caption).foregroundStyle(isError ? .orange : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            if case .ready = updater.state {
+                Button(L10n.text("Install and Restart"), action: model.installUpdateAndRestart).controlSize(.small)
+            } else {
+                Button(L10n.text("Check now"), action: model.checkForUpdates).controlSize(.small)
+                    .disabled(updater.installer == nil || updater.state == .checking || isDownloading)
+            }
+        }
+    }
+
+    private var isDownloading: Bool {
+        if case .downloading = updater.state { return true }
+        return false
+    }
+
+    private var isError: Bool {
+        if updater.unavailableReason != nil { return true }
+        if case .failed = updater.state { return true }
+        return false
+    }
+
+    private var status: String {
+        if let reason = updater.unavailableReason { return reason }
+        switch updater.state {
+        case .idle: return L10n.text("Version %@", updater.currentVersion)
+        case .checking: return L10n.text("Checking for updates …")
+        case .upToDate: return L10n.text("DevWatch %@ is up to date.", updater.currentVersion)
+        case .downloading(let version): return L10n.text("Downloading DevWatch %@ …", version)
+        case .ready(let version):
+            return model.automaticUpdates
+                ? L10n.text("DevWatch %@ is ready and installs when you quit.", version)
+                : L10n.text("DevWatch %@ is ready to install.", version)
+        case .installed: return L10n.text("The update is installed and starts next time.")
+        case .failed(let message): return message
+        }
     }
 }

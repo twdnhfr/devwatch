@@ -44,4 +44,6 @@ This uses the existing DMG, creates the tag `v<Version>`, pushes it to `origin`,
 
 The publish step deliberately does not rebuild the app, which would discard the notarized and stapled bundle. It stops if the DMG is missing or lacks a valid notarization ticket, the working tree is not clean, `HEAD` has not been pushed, or the tag already exists. For a new version, update the version number in `Support/Info.plist`, then run `release` followed by `publish`.
 
+Installed copies update themselves from this release. They only accept an asset named `DevWatch-<Version>.dmg` with the SHA-256 digest that GitHub records for it, and an app inside that carries the same bundle identifier, team ID and version. Drafts and pre-releases are ignored.
+
 [Back to the README](../README.md)

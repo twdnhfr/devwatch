@@ -33,7 +33,7 @@ DevWatch supports English and German and follows your macOS language preferences
 - **Multiple projects at once:** A compact project overview with process status, script results, and live logs.
 - **Stop after 30 minutes of inactivity:** Stops the default process when no relevant files have changed. With autostart enabled, the next change starts it again.
 - **Per-project controls:** Start, stop, pause autostart, and hide projects. Explicit pauses persist across app restarts.
-- **Launch at login and update notices:** Optionally start with macOS and receive notifications about new GitHub releases.
+- **Launch at login and automatic updates:** Optionally start with macOS. New releases are downloaded in the background and installed when you quit DevWatch.
 
 ## Getting started
 
@@ -63,7 +63,7 @@ The inactivity timer only tracks relevant file changes. Reading code in an edito
 
 Project management and file watching run locally and require no account. Projects, root folders, and hidden paths are stored in `~/Library/Application Support/DevWatch/`. Logs stay in memory. Removing a project from the app does not delete its files.
 
-For update notices, DevWatch checks the GitHub API for the latest release at launch and once a day thereafter. The notice opens the release page; downloads and installation are manual. Failed checks do not display an error. Project scripts launched by DevWatch may make their own network connections independently.
+DevWatch checks the GitHub API for the latest release shortly after launch and once a day thereafter. It downloads a newer DMG in the background and installs it only if its SHA-256 checksum matches the release and the app inside is signed with the same Developer ID. The update is installed when you quit DevWatch, or right away with **Install and Restart**; restarting stops running development processes. You can turn off **Install updates automatically** in the settings and still check manually. Updates require a signed release in a writable location such as `/Applications`. Failed checks do not display an error. Project scripts launched by DevWatch may make their own network connections independently.
 
 ## Known limitations
 
@@ -87,7 +87,7 @@ swift test
 
 Alternatively, open `Package.swift` in Xcode. See the **[build and release guide](docs/RELEASE.md)** for app bundles, DMGs, signing, notarization, and publishing.
 
-For forks, point `DWReleaseFeedURL` in `Support/Info.plist` to your own repository, or remove the key to disable update checks.
+For forks, point `DWReleaseFeedURL` in `Support/Info.plist` to your own repository, or remove the key to disable updates.
 
 ## Contributing
 
