@@ -19,6 +19,8 @@ public final class DevelopmentProcess: ObservableObject {
     private var generation = UUID()
     private var requestedStop = false
     private let logLimit = 64_000
+    private var pendingLog = ""
+    private var logFlushScheduled = false
 
     public init() {}
 
@@ -30,6 +32,8 @@ public final class DevelopmentProcess: ObservableObject {
         exitCode = nil
         state = .idle
         log = ""
+        pendingLog = ""
+        logFlushScheduled = false
         requestedStop = false
         let token = UUID()
         generation = token
@@ -90,7 +94,7 @@ public final class DevelopmentProcess: ObservableObject {
                         : decoder.finish()
                     DispatchQueue.main.async { [weak self] in
                         guard let self, self.generation == token else { return }
-                        self.append(chunk)
+                        self.bufferOutput(chunk, token: token)
                     }
                     if count <= 0 { break }
                 }
@@ -105,6 +109,7 @@ public final class DevelopmentProcess: ObservableObject {
                     if !self.requestedStop && status != 0 {
                         self.errorMessage = L10n.text("Process exited (status %@). See the log for details.", String(describing: status))
                     }
+                    self.flushOutput()
                     self.append(L10n.text("\nProcess ended.\n"))
                     // Subscribers to isRunning must already see the final result.
                     self.isRunning = false
@@ -121,6 +126,26 @@ public final class DevelopmentProcess: ObservableObject {
         guard let child, !requestedStop else { return }
         requestedStop = true
         child.terminate()
+    }
+
+    /// Chatty servers write many small chunks; publishing each one would re-render the log every time.
+    private func bufferOutput(_ text: String, token: UUID) {
+        guard !text.isEmpty else { return }
+        pendingLog += text
+        guard !logFlushScheduled else { return }
+        logFlushScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self, self.generation == token else { return }
+            self.flushOutput()
+        }
+    }
+
+    private func flushOutput() {
+        logFlushScheduled = false
+        guard !pendingLog.isEmpty else { return }
+        let text = pendingLog
+        pendingLog = ""
+        append(text)
     }
 
     private func append(_ text: String) {

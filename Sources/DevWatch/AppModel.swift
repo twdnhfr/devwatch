@@ -304,9 +304,7 @@ final class AppModel: ObservableObject {
                 let runner = existing ?? ProjectAutomation(project: command, persist: { _ in true })
                 runner.configure(command)
                 extraScripts[key] = runner
-                scriptSubscriptions[key] = runner.process.objectWillChange.sink { [weak self] _ in
-                    self?.objectWillChange.send()
-                }
+                scriptSubscriptions[key] = forwardStatus(of: runner.process)
                 refreshOwnership()
                 runner.startManually()
             }
@@ -330,10 +328,18 @@ final class AppModel: ObservableObject {
             catch { self.errorMessage = error.localizedDescription; return false }
         }
         automations[project.id] = automation
-        subscriptions[project.id] = automation.process.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }
+        subscriptions[project.id] = forwardStatus(of: automation.process)
         return automation
+    }
+
+    /// Log output is observed by the detail view directly; forwarding it would rebuild
+    /// every view and the status item on each chunk a development server writes.
+    private func forwardStatus(of process: DevelopmentProcess) -> AnyCancellable {
+        Publishers.Merge4(process.$state.dropFirst().map { _ in () },
+                          process.$isRunning.dropFirst().map { _ in () },
+                          process.$exitCode.dropFirst().map { _ in () },
+                          process.$errorMessage.dropFirst().map { _ in () })
+            .sink { [weak self] in self?.objectWillChange.send() }
     }
 
     private func refreshOwnership() {
