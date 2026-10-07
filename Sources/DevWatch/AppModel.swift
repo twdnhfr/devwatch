@@ -23,6 +23,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var scanWarnings: [String] = []
     private var scanTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var rootWatcher: RootFolderWatcher?
+    private var rescanRequested = false
     private let rootStorage: RootFolderSettingsStorage
     private var rootsAvailable = true
     @Published var errorMessage: String?
@@ -99,13 +101,28 @@ final class AppModel: ObservableObject {
     func activateDiscovery() {
         guard refreshTask == nil else { return }
         if automaticUpdates { updater.startAutomaticChecks() }
+        watchRoots()
         rescan()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                // File events trigger rescans; polling remains for roots FSEvents cannot watch.
+                let interval = self?.rootWatcher == nil ? 30 : 600
+                try? await Task.sleep(for: .seconds(interval))
                 guard !Task.isCancelled else { return }
                 self?.rescan()
             }
+        }
+    }
+
+    private func watchRoots() {
+        rootWatcher?.stop()
+        rootWatcher = nil
+        let watcher = RootFolderWatcher(roots: rootSettings.paths) { [weak self] in self?.rescan() }
+        do {
+            try watcher.start()
+            rootWatcher = watcher
+        } catch {
+            // The polling fallback in activateDiscovery keeps discovery working.
         }
     }
 
@@ -171,6 +188,7 @@ final class AppModel: ObservableObject {
             if !updated.paths.contains(path) { updated.paths.append(path) }
         }
         guard saveRoots(updated) else { return }
+        if refreshTask != nil { watchRoots() }
         rescan()
     }
 
@@ -178,6 +196,7 @@ final class AppModel: ObservableObject {
         var updated = rootSettings
         updated.paths.removeAll { $0 == path }
         guard saveRoots(updated) else { return }
+        if refreshTask != nil { watchRoots() }
         rescan()
     }
 
@@ -189,7 +208,10 @@ final class AppModel: ObservableObject {
     }
 
     func rescan() {
-        guard !isScanning, rootsAvailable, storageAvailable else { return }
+        guard rootsAvailable, storageAvailable else { return }
+        // Changes reported during a scan may have been missed by it; scan once more afterwards.
+        guard !isScanning else { rescanRequested = true; return }
+        rescanRequested = false
         isScanning = true
         let roots = rootSettings.paths
         scanTask = Task { [weak self] in
@@ -227,6 +249,7 @@ final class AppModel: ObservableObject {
             } catch { self.errorMessage = error.localizedDescription }
             self.isScanning = false
             self.refreshScripts()
+            if self.rescanRequested { self.rescan() }
         }
     }
 
@@ -456,6 +479,8 @@ final class AppModel: ObservableObject {
         updater.stopAutomaticChecks()
         scanTask?.cancel()
         refreshTask?.cancel()
+        rootWatcher?.stop()
+        rootWatcher = nil
         allAutomations.forEach { $0.shutdown() }
     }
 

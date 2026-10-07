@@ -20,7 +20,7 @@ public struct RepositoryScanResult: Sendable {
 }
 
 public enum RepositoryScanner {
-    private static let excludedDirectories: Set<String> = [
+    static let excludedDirectories: Set<String> = [
         ".git", "node_modules", "vendor", "storage", "dist", ".build", "build",
         ".swiftpm", ".cache", "cache", "caches", "Caches", ".next", ".nuxt",
         ".output", ".turbo", ".parcel-cache", "coverage", "DerivedData"
