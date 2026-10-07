@@ -15,6 +15,12 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private var shuttingDown = false
     private var globalClickMonitor: Any?
     private var localClickMonitor: Any?
+    private struct IconState: Equatable {
+        let running: Bool
+        let scanning: Bool
+        let dark: Bool
+    }
+    private var iconState: IconState?
 
     init(model: AppModel) {
         self.model = model
@@ -146,13 +152,23 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private func refresh() {
         guard !shuttingDown, let button = statusItem?.button else { return }
         let dark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        button.image = MenuBarIcon.make(running: model.runningCount > 0, scanning: model.isScanning, dark: dark)
-        let status = model.runningCount > 0
-            ? L10n.text("Running development processes: %@", String(describing: model.runningCount))
+        let runningCount = model.runningCount
+        let icon = IconState(running: runningCount > 0, scanning: model.isScanning, dark: dark)
+        // Assigning an image makes AppKit update the menu bar replicants, which reports
+        // effectiveAppearance again; reassigning it on every refresh never settles.
+        if icon != iconState {
+            iconState = icon
+            button.image = MenuBarIcon.make(running: icon.running, scanning: icon.scanning, dark: dark)
+        }
+        let status = runningCount > 0
+            ? L10n.text("Running development processes: %@", String(describing: runningCount))
             : (model.isScanning ? L10n.text("Scanning for Git projects") : L10n.text("No development processes running"))
         let promptHint = model.approvalPrompts.isEmpty ? "" : L10n.text(" · Approval pending")
-        button.toolTip = "DevWatch: \(status)\(promptHint)"
-        button.setAccessibilityLabel("DevWatch: \(status)\(promptHint)")
+        let label = "DevWatch: \(status)\(promptHint)"
+        if button.toolTip != label {
+            button.toolTip = label
+            button.setAccessibilityLabel(label)
+        }
 
         let ids = Set(model.approvalPrompts.map(\.id))
         let newIDs = ids.subtracting(knownPromptIDs)

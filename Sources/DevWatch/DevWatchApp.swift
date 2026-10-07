@@ -28,10 +28,13 @@ struct DevWatchApp: App {
 }
 
 /// A non-template image preserves the badge color in the macOS status bar.
+@MainActor
 enum MenuBarIcon {
+    private static let logo = Bundle.main.url(forResource: "DevWatch", withExtension: "icns")
+        .flatMap { NSImage(contentsOf: $0) }
+
     static func make(running: Bool, scanning: Bool, dark: Bool) -> NSImage {
-        let logo = Bundle.main.url(forResource: "DevWatch", withExtension: "icns")
-            .flatMap { NSImage(contentsOf: $0) }
+        let logo = Self.logo
         let image = NSImage(size: NSSize(width: 22, height: 18), flipped: false) { _ in
             if let logo {
                 logo.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
