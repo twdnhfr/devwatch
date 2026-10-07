@@ -129,8 +129,10 @@ done
 
 # Eine stabile Signatur hält die einmal erteilten Ordner-Berechtigungen (TCC) über
 # Builds hinweg gültig; ad-hoc ("-") wechselt bei jedem Build die Identität.
+# Der SHA-1-Hash statt des Namens: codesign findet Namen mit Umlauten nicht mehr
+# zuverlässig ("Wiedenhöfer … no identity found").
 identity="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning \
-    | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)}"
+    | sed -n 's/.*\([0-9A-F]\{40\}\) "Developer ID Application: [^"]*".*/\1/p' | head -1)}"
 
 if [ "$mode" != "release" ]; then
     codesign --force --sign "${identity:--}" "$app_dir"

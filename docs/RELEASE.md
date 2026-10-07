@@ -29,7 +29,7 @@ cp scripts/release.env.example scripts/release.env
 | Setting | Description |
 | --- | --- |
 | `NOTARY_PROFILE` | Name of the `notarytool` keychain profile. Create it once with `xcrun notarytool store-credentials <name> --apple-id <email> --team-id <TEAMID>`; the command prompts for an app-specific Apple password. If this setting is missing, the release workflow stops with an explanation rather than guessing a profile. |
-| `SIGN_IDENTITY` | Signing identity to use, such as `Developer ID Application: … (TEAMID)`. If omitted, the first matching identity in the keychain is used. List identities with `security find-identity -v -p codesigning`. |
+| `SIGN_IDENTITY` | Signing identity to use, such as `Developer ID Application: … (TEAMID)` or its SHA-1 hash. Prefer the hash when the name contains non-ASCII characters, which `codesign` may fail to match. If omitted, the first matching identity in the keychain is used. List identities with `security find-identity -v -p codesigning`. |
 | `SKIP_NOTARIZE=1` | Sign and build the DMG without Apple notarization. Intended for quick local runs; the result is not suitable for distribution. |
 
 Each setting can also be supplied as an environment variable, which takes precedence over the file: `SKIP_NOTARIZE=1 ./scripts/build-app.sh release`. Use `DEVWATCH_RELEASE_ENV` to select a different configuration file. The file is parsed, not executed; unknown keys are skipped with a warning.
